@@ -11,12 +11,4 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
-  server: {
-    host: true,
-    allowedHosts: [
-      '.ngrok-free.app',
-      '.ngrok.io',
-      'shopper-agent-mustard.ngrok-free.dev'
-    ]
-  }
 })
