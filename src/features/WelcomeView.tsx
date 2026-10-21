@@ -1,6 +1,5 @@
 // src/features/WelcomeView.tsx
 import {
-  Pill,
   CalendarClock,
   PackageCheck,
   ShieldAlert,

@@ -1,6 +1,6 @@
 // src/features/ScheduleView.tsx
 import { useMemo, useState } from "react";
-import { CalendarClock, Check, Clock, Pill, User, Calendar, AlertTriangle, PackageX } from "lucide-react";
+import { CalendarClock, Check, Clock, User, Calendar, PackageX } from "lucide-react";
 
 import {
   Card,
