@@ -1,0 +1,71 @@
+{
+  "$schema": "https://supabase.com/schemas/config/v1.json",
+  // Local Supabase configuration for MediDose (current CLI config schema).
+  "project_id": "medidose",
+
+  "api": {
+    "enabled": true,
+    "port": 54321,
+    "schemas": ["public", "graphql_public"],
+    "extra_search_path": ["public", "extensions"],
+    "max_rows": 1000
+  },
+
+  "db": {
+    "port": 54322,
+    "shadow_port": 54320,
+    "major_version": 17,
+    "migrations": {
+      "enabled": true
+    },
+    "seed": {
+      "enabled": false
+    }
+  },
+
+  "realtime": {
+    "enabled": false
+  },
+
+  "studio": {
+    "enabled": true,
+    "port": 54323
+  },
+
+  "local_smtp": {
+    "enabled": true,
+    "port": 54324
+  },
+
+  "storage": {
+    "enabled": false
+  },
+
+  "analytics": {
+    "enabled": false
+  },
+
+  "auth": {
+    "enabled": true,
+    "site_url": "http://localhost:3000",
+    "additional_redirect_urls": [
+      "http://localhost:3000/auth/confirm",
+      "http://localhost:3000/auth/callback",
+      "http://localhost:3000/reset-password"
+    ],
+    "jwt_expiry": 3600,
+    "enable_signup": true,
+    // Supabase Auth is the guardrail that also covers direct anon-key calls,
+    // which bypass the server actions. Keep in sync with PASSWORD_MIN_LENGTH in
+    // src/lib/password-policy.ts.
+    "minimum_password_length": 10,
+    // Deliberately no character-class requirements: the app policy prefers
+    // length plus common/identity/variety checks over composition rules.
+    "password_requirements": "",
+    "email": {
+      "enabled": true,
+      "double_confirm_changes": true,
+      "enable_confirmations": true
+    }
+  }
+}
