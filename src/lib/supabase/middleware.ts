@@ -9,6 +9,9 @@ const PUBLIC_PREFIXES = [
   "/forgot-password",
   "/reset-password",
   "/auth",
+  // Supabase calls this from its own servers with a signed payload and no
+  // session cookie; the route verifies the signature itself.
+  "/api/auth/send-email",
 ]
 
 function isPublicPath(pathname: string): boolean {

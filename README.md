@@ -92,14 +92,31 @@ npm run db:types
 1. Enable email confirmation and set the Site URL to the app origin.
 2. Add the redirect allow-list entries for your origin: `/auth/confirm`,
    `/auth/callback`, and `/reset-password` (plus localhost during development).
-   These are declared in `supabase/config.jsonc`. The default Supabase email
-   templates work through the PKCE code exchange in those routes. Custom
-   `token_hash` templates require a paid plan or a custom SMTP provider; if
-   available, point the confirmation template at
-   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`.
+   These are declared in `supabase/config.jsonc`. Auth emails are composed in
+   this repo and posted by our own route — see [Auth email](#auth-email).
 3. Apply migrations: `supabase link --project-ref "$SUPABASE_PROJECT_REF"` then
    `npm run db:push`.
 4. Do **not** run `npm run seed` against production.
+
+## Auth email
+
+Supabase Auth still mints the tokens; the message is ours. `src/lib/email/templates.ts`
+renders the HTML and text for each action, `src/app/api/auth/send-email/route.ts`
+verifies the hook signature and posts over SMTP (`src/lib/email/smtp.ts`).
+
+1. Auth → Hooks in the dashboard → **Send Email hook**, type HTTPS, URL
+   `https://<your-origin>/api/auth/send-email`. Generate the secret.
+2. Set `SEND_EMAIL_HOOK_SECRET` (keep the `v1,whsec_` prefix) and the `SMTP_*` /
+   `EMAIL_FROM*` variables from `.env.example` in the deployment environment.
+3. Gmail as the sender needs no domain: create the account, enable 2-Step
+   Verification, create an app password, and use `smtp.gmail.com:587` with that
+   password. Swap in Brevo or Mailtrap once a sending domain is verified — the
+   route only knows SMTP host, port and credentials.
+
+Keep the built-in templates as fallback copy: with the hook enabled Supabase
+never uses them, but the dashboard still shows them when the hook is off.
+Local `npm run db:start` keeps using Inbucket unless you enable the hook in
+`supabase/config.jsonc`.
 
 ## Scripts
 
