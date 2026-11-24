@@ -71,7 +71,12 @@ export function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;")
 }
 
-/** `redirect_to` is set by Auth from our allow-list; `site_url` is the fallback. */
+/**
+ * `redirect_to` is set by Auth from our allow-list; the configured site URL and
+ * then the dashboard `site_url` are fallbacks. `site_url` can be stale (often
+ * localhost), so the explicit env var sits ahead of it; the last value is the
+ * local-development fallback only.
+ */
 function safeOrigin(...candidates: Array<string | null | undefined>): string {
   for (const candidate of candidates) {
     if (!candidate) continue
@@ -110,7 +115,11 @@ function confirmLink(
   fixedNext?: string,
 ): string {
   const { redirect_to, site_url } = payload.email_data
-  const origin = safeOrigin(redirect_to, site_url)
+  const origin = safeOrigin(
+    redirect_to,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    site_url,
+  )
   const params = new URLSearchParams({ token_hash: tokenHash, type: otpType })
   const next = fixedNext ?? safeNext(redirect_to)
   if (next) params.set("next", next)

@@ -8,6 +8,15 @@ export function getSupabaseUrl(): string {
   return value
 }
 
+/**
+ * Optional public origin for links in auth email. Null means "use the request
+ * headers", which `resolveSiteUrl` handles (see src/lib/site-url.ts).
+ */
+export function getConfiguredSiteUrl(): string | null {
+  const value = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+  return value ? value : null
+}
+
 export function getSupabaseAnonKey(): string {
   const value = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!value) {

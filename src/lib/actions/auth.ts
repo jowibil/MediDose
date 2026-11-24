@@ -1,29 +1,16 @@
 "use server"
 
-import { cookies, headers } from "next/headers"
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { getSiteUrl } from "@/lib/site-url"
 import type { ActionResult } from "@/lib/action-result"
 import { mapAuthError } from "@/lib/auth-errors"
 import type { AuthResult } from "@/lib/form-results"
 import { validateDisplayName } from "@/lib/validation"
 import { checkPasswordPolicy } from "@/lib/password-policy"
 import { isValidTimeZone, TIMEZONE_COOKIE } from "@/lib/timezone"
-
-async function getOrigin(): Promise<string> {
-  const headerStore = await headers()
-  const host =
-    headerStore.get("x-forwarded-host") ??
-    headerStore.get("host") ??
-    "localhost:3000"
-  const proto =
-    headerStore.get("x-forwarded-proto") ??
-    (host.startsWith("localhost") || host.startsWith("127.0.0.1")
-      ? "http"
-      : "https")
-  return `${proto}://${host}`
-}
 
 async function rememberTimeZone(timeZone?: string): Promise<void> {
   if (!timeZone || !isValidTimeZone(timeZone)) return
@@ -89,7 +76,7 @@ export async function signUpAction(input: {
     return { ok: false, error: "The passwords don’t match." }
   }
 
-  const origin = await getOrigin()
+  const origin = await getSiteUrl()
   const next = input.role === "owner" ? "/dashboard" : "/join"
 
   const supabase = await createSupabaseServerClient()
@@ -113,14 +100,51 @@ export async function signUpAction(input: {
   await rememberTimeZone(input.timezone)
 
   if (data.session) {
-    return { ok: true, data: { message: "Account created." } }
+    // Confirmation is off for this project: the session already exists.
+    return { ok: true, data: { redirectTo: next } }
   }
 
+  // The waiting state lives at its own URL so a refresh or a shared link keeps
+  // it. Only the address travels with it — never the password.
+  const params = new URLSearchParams({ email, role: input.role })
+  return {
+    ok: true,
+    data: { redirectTo: `/signup/check-email?${params.toString()}` },
+  }
+}
+
+/**
+ * Re-sends the sign-up confirmation link. The reply is deliberately identical
+ * whether or not the address is registered, so this cannot be used to probe
+ * for accounts; the 60-second cooldown in the panel and Auth's own per-address
+ * throttle keep it from being a relay.
+ */
+export async function resendConfirmationAction(input: {
+  email: string
+  role?: "owner" | "caregiver"
+}): Promise<AuthResult> {
+  const email = input.email.trim()
+  if (!email) return { ok: false, error: "Enter your email address." }
+
+  const origin = await getSiteUrl()
+  const next = input.role === "caregiver" ? "/join" : "/dashboard"
+  const supabase = await createSupabaseServerClient()
+
+  await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(next)}`,
+    },
+  })
+
+  // Errors (unknown address, throttle) are intentionally not surfaced: any
+  // difference in wording would reveal whether the address has an account.
   return {
     ok: true,
     data: {
       message:
-        "Check your email to confirm your address, then sign in to continue.",
+        "If that address still needs confirming, a new email is on its way.",
     },
   }
 }
@@ -131,7 +155,7 @@ export async function forgotPasswordAction(input: {
   const email = input.email.trim()
   if (!email) return { ok: false, error: "Enter your email address." }
 
-  const origin = await getOrigin()
+  const origin = await getSiteUrl()
   const supabase = await createSupabaseServerClient()
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/reset-password")}`,

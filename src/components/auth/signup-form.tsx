@@ -24,14 +24,12 @@ export function SignupForm({ initialRole = "owner" }: { initialRole?: Role }) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     setError(null)
-    setMessage(null)
     startTransition(async () => {
       const result = await signUpAction({
         role,
@@ -48,13 +46,13 @@ export function SignupForm({ initialRole = "owner" }: { initialRole?: Role }) {
         return
       }
 
-      if (result.data.message === "Account created.") {
-        router.push(role === "owner" ? "/dashboard" : "/join")
-        router.refresh()
-        return
-      }
-
-      setMessage(result.data.message ?? "Check your email to confirm your account.")
+      // The action decides where the flow goes: the dashboard/join when the
+      // project skips confirmation, otherwise the check-email route, which is
+      // a real URL so a refresh cannot drop the waiting state.
+      router.push(
+        result.data.redirectTo ?? (role === "owner" ? "/dashboard" : "/join"),
+      )
+      router.refresh()
     })
   }
 
@@ -169,16 +167,7 @@ export function SignupForm({ initialRole = "owner" }: { initialRole?: Role }) {
             </p>
           ) : null}
 
-          {message ? (
-            <p
-              role="status"
-              className="rounded-xl border border-sage/30 bg-sage-soft/60 p-3 text-xs text-sage-ink"
-            >
-              {message}
-            </p>
-          ) : null}
-
-          <Button type="submit" disabled={isPending || Boolean(message)}>
+          <Button type="submit" disabled={isPending}>
             {isPending
               ? "Creating account…"
               : role === "owner"

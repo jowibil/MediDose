@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import {
   isAuthEmailPayload,
@@ -105,6 +105,15 @@ describe("renderAuthEmails", () => {
     expect(confirmation.searchParams.get("token_hash")).toBe("hash-new")
   })
 
+  it("prefers the configured site URL over a stale dashboard site_url", () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://app.medidose.example")
+    const stale = payload({ action: "signup", redirectTo: "not-a-url" })
+    stale.email_data.site_url = "http://localhost:3000"
+
+    const [email] = renderAuthEmails(stale)
+    expect(firstLink(email!.text).origin).toBe("https://app.medidose.example")
+  })
+
   it("sends a code instead of a link for reauthentication", () => {
     const [email] = renderAuthEmails(
       payload({ action: "reauthentication", token: "481920" }),
@@ -118,6 +127,10 @@ describe("renderAuthEmails", () => {
     const [email] = renderAuthEmails(payload({ action: "something_new" }))
     expect(firstLink(email!.text).pathname).toBe("/auth/confirm")
   })
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe("isAuthEmailPayload", () => {

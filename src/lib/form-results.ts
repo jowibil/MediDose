@@ -5,7 +5,14 @@ export type SaveMedicineResult =
   | { ok: false; error: string; fieldErrors?: MedicineFormErrors }
 
 export type AuthResult =
-  | { ok: true; data: { message?: string } }
+  | {
+      ok: true
+      data: {
+        message?: string
+        /** Server-chosen destination, e.g. the check-email route. */
+        redirectTo?: string
+      }
+    }
   | { ok: false; error: string }
 
 export type JoinResult =

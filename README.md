@@ -57,6 +57,9 @@ cp .env.example .env.local   # fill in your Supabase values
 Environment variables:
 
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — browser-safe.
+- `NEXT_PUBLIC_SITE_URL` — the public origin used in auth email links. Set it
+  in Vercel for **Production and Preview**; unset it locally to fall back to
+  the request headers and `http://localhost:3000`.
 - `SUPABASE_SERVICE_ROLE_KEY` — **server/tests only**; never imported into
   `src/`. If your project uses Supabase’s newer publishable/secret key naming,
   map them to these variables.
@@ -89,9 +92,11 @@ npm run db:types
 
 ### Hosted project
 
-1. Enable email confirmation and set the Site URL to the app origin.
+1. Enable email confirmation, set the Site URL to the deployed origin, and set
+   `NEXT_PUBLIC_SITE_URL` to the same value for Production and Preview.
 2. Add the redirect allow-list entries for your origin: `/auth/confirm`,
-   `/auth/callback`, and `/reset-password` (plus localhost during development).
+   `/auth/callback`, and `/reset-password` (plus localhost during development
+   and a wildcard for Vercel preview deployments).
    These are declared in `supabase/config.jsonc`. Auth emails are composed in
    this repo and posted by our own route — see [Auth email](#auth-email).
 3. Apply migrations: `supabase link --project-ref "$SUPABASE_PROJECT_REF"` then
