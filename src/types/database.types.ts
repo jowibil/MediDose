@@ -354,8 +354,8 @@ isOneToOne: false
 "claim_patient":
 { Args: { "p_code": string }; Returns: string
                            },
-"consume_ai_quota":
-{ Args: { "p_limit"?: number }; Returns: boolean
+"dispose_medicine":
+{ Args: { "p_medicine_id": string }; Returns: number
                            },
 "freeze_week":
 { Args: { "p_patient_id": string,"p_slots": Json,"p_timezone": string,"p_week_start": string }; Returns: boolean
@@ -402,6 +402,9 @@ isOneToOne: false
 "purge_patient":
 { Args: { "p_patient_id": string }; Returns: undefined
                            },
+"refund_ai_request":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
 "regenerate_invite_code":
 { Args: { "p_household_id": string }; Returns: string
                            },
@@ -413,6 +416,9 @@ isOneToOne: false
                            },
 "restock_medicine":
 { Args: { "p_medicine_id": string,"p_quantity": number }; Returns: number
+                           },
+"restore_future_expected":
+{ Args: { "p_medicine_id": string,"p_today": string }; Returns: number
                            },
 "save_weekly_summary":
 { Args: { "p_patient_id": string,"p_payload": Json,"p_week_start": string }; Returns: string
@@ -428,6 +434,9 @@ isOneToOne: false
                            },
 "shares_household_with":
 { Args: { "uid": string }; Returns: boolean
+                           },
+"undo_dispose_medicine":
+{ Args: { "p_medicine_id": string }; Returns: number
                            },
 "unlink_patient":
 { Args: { "p_patient_id": string }; Returns: undefined

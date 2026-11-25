@@ -43,7 +43,11 @@ function fail(error: string, status: number) {
  *   3. normalised, length-checked question, screened for role-override attempts
  *   4. a real session, re-checked here rather than trusted from the middleware
  *   5. active-patient scope, so the record never spans patients
- *   6. burst cooldown + daily quota, consumed atomically in the database
+ *   6. burst cooldown + daily quota, consumed atomically in the database and
+ *      refunded if the provider fails, so a 502 never costs a question. The
+ *      cooldown runs from the moment the previous request was *accepted*, so a
+ *      slow answer does not block the next question and two simultaneous
+ *      requests still resolve to one;
  *   7. answer screening: no dose-change advice, bounded length
  *
  * Not in PUBLIC_PREFIXES in the middleware. No CSRF token is needed beyond the
@@ -85,9 +89,7 @@ export async function POST(request: Request) {
   if (validationError) return fail(validationError, 400)
 
   const screen = screenQuestion(question)
-  if (!screen.allowed) {
-    return fail(screen.reason ?? "That question can’t be answered.", 400)
-  }
+  if (!screen.allowed) return fail(screen.reason, 400)
 
   const context = await getSessionContext()
   if (!context) return fail("Please sign in again.", 401)
@@ -143,12 +145,18 @@ export async function POST(request: Request) {
       }),
     })
 
-    const screened = screenAnswer(answer)
     return NextResponse.json(
-      { answer: screened.text },
+      { answer: screenAnswer(answer) },
       { headers: { "cache-control": "no-store" } },
     )
   } catch (error) {
+    // The quota buys an answer, not an attempt: give it back. A failed refund
+    // must not replace the real error, so it is swallowed.
+    try {
+      await supabase.rpc("refund_ai_request")
+    } catch {
+      // Nothing to do: the provider error below is the useful message.
+    }
     if (error instanceof AiError) return fail(error.message, 502)
     return fail("The assistant could not answer. Please try again.", 502)
   }

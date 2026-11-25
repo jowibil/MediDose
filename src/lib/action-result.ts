@@ -40,6 +40,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   PATIENT_ACCOUNT_CANNOT_JOIN:
     "This is a patient account. Enter your patient link code instead of a household code.",
   NOT_ARCHIVED: "Archive this item before purging it.",
+  NOT_DISPOSED:
+    "This medicine isn’t in a disposed state, so there is nothing to undo.",
+  UNDO_WINDOW_EXPIRED:
+    "The undo window has passed. Settings → Restore brings the record back, but not the stock.",
   NOT_CAREGIVER: "That account isn’t a caregiver in this household.",
   NOT_FOUND: "We couldn’t find that item.",
   EXPIRED_DATE: "Expiration date can’t be in the past.",

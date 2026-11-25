@@ -24,6 +24,8 @@ const REASON_LABELS: Record<StockMovement["reason"], string> = {
   dose_reverted: "Dose reverted",
   restock: "Restock",
   owner_edit: "Owner edit",
+  disposed: "Disposed",
+  dispose_reverted: "Disposal undone",
 }
 
 /** Legacy threshold label kept alongside the supply badge. */

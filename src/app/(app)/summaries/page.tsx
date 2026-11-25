@@ -31,7 +31,7 @@ export default async function SummariesPage() {
 
   // The dashboard also does this; the page must work on a direct visit. It is
   // idempotent and skips the RPC when the week is already frozen.
-  await ensureWeekFrozen(active.id, weekStart, timeZone)
+  const weekFrozen = await ensureWeekFrozen(active.id, weekStart, timeZone)
 
   const summaries = await getWeeklySummaries(active.id, WEEKS_SHOWN)
   const byWeek = new Map(summaries.map((summary) => [summary.weekStart, summary]))
@@ -57,6 +57,20 @@ export default async function SummariesPage() {
           them. This is a care log, not medical advice.
         </p>
       </div>
+
+      {weekFrozen ? null : (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-2xl border border-destructive/40 bg-destructive/5 p-3 text-xs leading-relaxed text-destructive"
+        >
+          <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <p>
+            This week could not be frozen, so its numbers are not fixed yet and
+            a summary written now would be missing them. Reload the page to try
+            again; the failure is recorded in the server log.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4">
         {weeks.map((week) => (

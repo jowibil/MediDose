@@ -13,7 +13,10 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { EmptySection } from "@/components/empty-section"
 import { SupplyBadge } from "@/components/medicine-badges"
-import { ArchiveMedicineButton } from "@/components/medicines/medicine-actions"
+import {
+  ArchiveMedicineButton,
+  DisposeMedicineButton,
+} from "@/components/medicines/medicine-actions"
 import { RestockDialog } from "@/components/medicines/restock-dialog"
 
 function statusFor(medicine: Medicine, todayIso: string): ExpirationStatus {
@@ -101,10 +104,19 @@ export function ExpirationTab({
                         </p>
                       </div>
                       {role === "owner" ? (
-                        <ArchiveMedicineButton
-                          medicineId={medicine.id}
-                          medicineName={medicine.name}
-                        />
+                        column.status === "expired" ? (
+                          // One click here: the shelf life already decided it.
+                          <DisposeMedicineButton
+                            medicineId={medicine.id}
+                            medicineName={medicine.name}
+                            oneClick
+                          />
+                        ) : (
+                          <ArchiveMedicineButton
+                            medicineId={medicine.id}
+                            medicineName={medicine.name}
+                          />
+                        )
                       ) : null}
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">

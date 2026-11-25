@@ -25,7 +25,6 @@ const INJECTION_PATTERNS: RegExp[] = [
   /\b(ignore|disregard|forget)\s+(all\s+)?(your\s+|the\s+)?(previous|prior|above|earlier)\s+(instructions|rules|prompt)\b/i,
   /\b(system|developer)\s+(prompt|message|instructions)\b/i,
   /\byour\s+(instructions|rules|system\s+prompt)\b/i,
-  /\b(reveal|show|print|repeat|leak)\s+(me\s+)?(your|the)\s+(instructions|prompt|rules)\b/i,
   /\b(jailbreak|developer\s+mode|act\s+as\s+(a\s+)?(doctor|physician|pharmacist))\b/i,
 ]
 
@@ -43,8 +42,7 @@ const OFF_TOPIC_PATTERNS: RegExp[] = [
   /\b(who won|score|match|tournament|football|basketball|soccer)\b/i,
   /\b(write|debug|fix|explain)\b[^.?!]{0,30}\b(code|script|function|program|regex)\b/i,
   /\b(homework|essay|poem|joke|recipe|translate|summarise this article)\b/i,
-  /\b(capital of|president of|population of|history of)\b/i,
-  /\b(book|reserve|order|buy)\b[^.?!]{0,30}\b(flight|hotel|ticket)\b/i,
+  /\b(capital of|president of|population of)\b/i,
 ]
 
 /** Everything the assistant is allowed to be asked about. */
@@ -62,7 +60,11 @@ const MEDIDOSE_VOCABULARY: RegExp[] = [
 const UNSAFE_ADVICE_PATTERNS: RegExp[] = [
   /\b(increase|reduce|decrease|double|halve|lower)\s+(your|the)\s+(dose|dosage)\b/i,
   /\b(stop|start)\s+taking\s+(your|the|this)\s+\w+/i,
-  /\byou\s+(should|must|need\s+to)\s+(take|stop|start|change|skip|increase|reduce)\b/i,
+  // `take` is deliberately absent: "you should take it with food" is harmless
+  // adherence advice, and refusing it made the assistant look broken. Changing,
+  // stopping, or skipping a prescribed medicine is the line.
+  /\byou\s+(should|must|need\s+to)\s+(stop|start|change|skip|increase|reduce)\b/i,
+  /\byou\s+(should|must|need\s+to)\s+(take|use)\s+(two|three|four|double|more|less|half|another)\b/i,
   /\byou\s+(likely\s+|probably\s+)?have\s+(an?\s+)?(infection|condition|disease|disorder|overdose)\b/i,
   /\bit('s|\s+is)\s+(safe|fine)\s+to\s+(take|stop|skip|double)\b/i,
 ]
@@ -79,10 +81,7 @@ export function normalizeQuestion(raw: string): string {
   return cleaned.replace(/\s+/g, " ").trim()
 }
 
-export interface QuestionScreen {
-  allowed: boolean
-  reason?: string
-}
+export type QuestionScreen = { allowed: true } | { allowed: false; reason: string }
 
 export function screenQuestion(question: string): QuestionScreen {
   if (INJECTION_PATTERNS.some((pattern) => pattern.test(question))) {
@@ -105,27 +104,19 @@ export function screenQuestion(question: string): QuestionScreen {
   return { allowed: true }
 }
 
-export interface AnswerScreen {
-  text: string
-  /** True when the answer was replaced or cut, for logging and tests. */
-  flagged: boolean
-}
-
 /**
  * Last line of defence on the way out: replace advice the assistant must never
- * give, and keep the answer to a readable length.
+ * give, and keep the answer to a readable length. Returns the text to show.
  */
-export function screenAnswer(answer: string): AnswerScreen {
+export function screenAnswer(answer: string): string {
   const trimmed = answer.trim()
-  if (!trimmed) return { text: SAFE_ANSWER, flagged: true }
+  if (!trimmed) return SAFE_ANSWER
 
   if (UNSAFE_ADVICE_PATTERNS.some((pattern) => pattern.test(trimmed))) {
-    return { text: SAFE_ANSWER, flagged: true }
+    return SAFE_ANSWER
   }
 
-  if (trimmed.length <= MAX_ANSWER_CHARS) {
-    return { text: trimmed, flagged: false }
-  }
+  if (trimmed.length <= MAX_ANSWER_CHARS) return trimmed
 
   const cut = trimmed.slice(0, MAX_ANSWER_CHARS)
   const lastSentence = Math.max(
@@ -133,8 +124,7 @@ export function screenAnswer(answer: string): AnswerScreen {
     cut.lastIndexOf("? "),
     cut.lastIndexOf("! "),
   )
-  const text = lastSentence > 200 ? cut.slice(0, lastSentence + 1) : `${cut.trim()}…`
-  return { text, flagged: true }
+  return lastSentence > 200 ? cut.slice(0, lastSentence + 1) : `${cut.trim()}…`
 }
 
 /**

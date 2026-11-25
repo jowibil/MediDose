@@ -22,6 +22,7 @@ import { CabinetTab } from "@/components/medicines/cabinet-tab"
 import { InventoryTab } from "@/components/medicines/inventory-tab"
 import { ExpirationTab } from "@/components/medicines/expiration-tab"
 import { PharmacyListPanel } from "@/components/medicines/pharmacy-list-panel"
+import { DisposeUndoProvider } from "@/components/medicines/dispose-undo"
 
 export const metadata = { title: "Medicines" }
 
@@ -77,42 +78,46 @@ export default async function MedicinesPage({
 
       <MedicinesTabs active={tab} />
 
-      {tab === "cabinet" ? (
-        <CabinetTab
-          medicines={medicines}
-          role={context.role}
-          now={now}
-          todayIso={todayIso}
-          patientId={active.id}
-        />
-      ) : null}
+      {/* The undo banner outlives the row it refers to, so it sits above
+          the panels rather than inside them. */}
+      <DisposeUndoProvider>
+        {tab === "cabinet" ? (
+          <CabinetTab
+            medicines={medicines}
+            role={context.role}
+            now={now}
+            todayIso={todayIso}
+            patientId={active.id}
+          />
+        ) : null}
 
-      {tab === "inventory" ? (
-        <InventoryTab
-          medicines={medicines}
-          role={context.role}
-          now={now}
-          todayIso={todayIso}
-          movements={movements}
-        />
-      ) : null}
+        {tab === "inventory" ? (
+          <InventoryTab
+            medicines={medicines}
+            role={context.role}
+            now={now}
+            todayIso={todayIso}
+            movements={movements}
+          />
+        ) : null}
 
-      {tab === "expiration" ? (
-        <ExpirationTab
-          medicines={medicines}
-          role={context.role}
-          now={now}
-          todayIso={todayIso}
-        />
-      ) : null}
+        {tab === "expiration" ? (
+          <ExpirationTab
+            medicines={medicines}
+            role={context.role}
+            now={now}
+            todayIso={todayIso}
+          />
+        ) : null}
 
-      {tab === "pharmacy" && pharmacyList ? (
-        <PharmacyListPanel
-          list={pharmacyList}
-          householdName={active.householdName}
-          todayIso={todayIso}
-        />
-      ) : null}
+        {tab === "pharmacy" && pharmacyList ? (
+          <PharmacyListPanel
+            list={pharmacyList}
+            householdName={active.householdName}
+            todayIso={todayIso}
+          />
+        ) : null}
+      </DisposeUndoProvider>
     </div>
   )
 }

@@ -160,6 +160,84 @@ export async function archiveMedicineAction(
   return ok(null)
 }
 
+/**
+ * Discard the remaining stock and archive the medicine, keeping its history.
+ * Owner only; the RPC enforces that as well. Returns how many doses went.
+ */
+export async function disposeMedicineAction(
+  medicineId: string,
+): Promise<ActionResult<{ discarded: number }>> {
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
+  if (!ownerHouseholdId(context)) {
+    return fail("Only the household owner can dispose of medicines.")
+  }
+
+  const supabase = await createSupabaseServerClient()
+  const { data, error } = await supabase.rpc("dispose_medicine", {
+    p_medicine_id: medicineId,
+  })
+  if (error) return fail(mapDbError(error))
+
+  // Same reason as archiving: doses nobody can take must not depress this
+  // week's adherence. Past frozen slots stay.
+  const todayIso = getTodayInTimeZone(await getTimeZone())
+  await supabase.rpc("remove_future_expected", {
+    p_medicine_id: medicineId,
+    p_today: todayIso,
+  })
+
+  revalidateViews("medicine")
+  revalidateViews("summary")
+  return ok({ discarded: Number(data ?? 0) })
+}
+
+/**
+ * Undo a disposal inside the short window. The quantity comes from the ledger
+ * row the disposal wrote, never from the client.
+ *
+ * Both halves are reversed: the stock and the archive, then the frozen future
+ * slots the disposal removed. Restoring only the medicine left the week's
+ * denominator short of the cabinet, which quietly inflated adherence for the
+ * rest of an in-progress week.
+ */
+export async function undoDisposeMedicineAction(
+  medicineId: string,
+): Promise<ActionResult<{ restored: number }>> {
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
+  if (!ownerHouseholdId(context)) {
+    return fail("Only the household owner can undo a disposal.")
+  }
+
+  const supabase = await createSupabaseServerClient()
+  const { data, error } = await supabase.rpc("undo_dispose_medicine", {
+    p_medicine_id: medicineId,
+  })
+  if (error) return fail(mapDbError(error))
+
+  // The medicine is back, so its remaining doses for this week are expected
+  // again. Future-only and frozen-weeks-only, enforced inside the RPC.
+  const todayIso = getTodayInTimeZone(await getTimeZone())
+  const { error: restoreError } = await supabase.rpc(
+    "restore_future_expected",
+    { p_medicine_id: medicineId, p_today: todayIso },
+  )
+  if (restoreError) {
+    // The medicine and its stock are already restored; say so rather than
+    // reporting a failed undo and inviting a second one.
+    console.error("dispose: restore_future_expected failed", {
+      medicineId,
+      code: restoreError.code,
+      message: restoreError.message,
+    })
+  }
+
+  revalidateViews("medicine")
+  revalidateViews("summary")
+  return ok({ restored: Number(data ?? 0) })
+}
+
 export async function restoreMedicineAction(
   medicineId: string,
 ): Promise<ActionResult> {

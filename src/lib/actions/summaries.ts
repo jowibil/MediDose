@@ -19,21 +19,25 @@ import { buildSummaryUserPrompt, SUMMARY_SYSTEM_PROMPT } from "@/lib/ai/prompts"
 
 /**
  * Freezes the week if it is not frozen yet. Called from the dashboard on every
- * visit, so it must be quiet: failures are ignored and the page renders from
- * whatever it already had. `freeze_week` is idempotent, and the select below
- * skips the RPC entirely for the common case.
+ * visit, so it never throws and never blocks the page. `freeze_week` is
+ * idempotent, and the select below skips the RPC entirely for the common case.
+ *
+ * Returns whether the week is frozen. A failed RPC used to be dropped on the
+ * floor: the page rendered as "untracked", the summary was then written from an
+ * empty denominator, and nothing anywhere said why. Now the failure is logged
+ * and the return value lets the summaries page say so out loud.
  */
 export async function ensureWeekFrozen(
   patientId: string,
   weekStart: string,
   timeZone: string,
-): Promise<void> {
+): Promise<boolean> {
   const { context } = await requireSession()
-  if (!context || !canAccessPatient(context, patientId)) return
+  if (!context || !canAccessPatient(context, patientId)) return false
 
   const supabase = await createSupabaseServerClient()
   const plan = await getWeekPlan(patientId, weekStart)
-  if (plan) return
+  if (plan) return true
 
   const medicines = await getMedicinesIncludingArchived(patientId)
   const slots = buildWeekSlots(medicines, weekStart).map((slot) => ({
@@ -43,12 +47,25 @@ export async function ensureWeekFrozen(
     time: slot.scheduledTime,
   }))
 
-  await supabase.rpc("freeze_week", {
+  const { error } = await supabase.rpc("freeze_week", {
     p_patient_id: patientId,
     p_week_start: weekStart,
     p_timezone: timeZone,
     p_slots: slots,
   })
+
+  if (error) {
+    // Ids only: no patient names or medicine names in logs.
+    console.error("summary: freeze_week failed", {
+      patientId,
+      weekStart,
+      code: error.code,
+      message: error.message,
+    })
+    return false
+  }
+
+  return true
 }
 
 /**

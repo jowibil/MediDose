@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { toMedicine, toPatient } from "@/lib/mappers"
 import type { Medicine, Patient } from "@/types/medicine"
+import type { PharmacyMedicine } from "@/lib/pharmacy-list"
 import type { DoseLogRow } from "@/lib/occurrences"
 
 /**
@@ -27,10 +28,6 @@ export async function getMedicines(
   return (data ?? []).map((row) => toMedicine(row))
 }
 
-export interface HouseholdMedicine extends Medicine {
-  patientName: string
-}
-
 /**
  * Every active medicine across the household, each tagged with its patient.
  * The pharmacy list is one trip for the whole household, so it is the one
@@ -39,7 +36,7 @@ export interface HouseholdMedicine extends Medicine {
  */
 export async function getHouseholdMedicines(
   householdId: string,
-): Promise<HouseholdMedicine[]> {
+): Promise<PharmacyMedicine[]> {
   const supabase = await createSupabaseServerClient()
   const { data } = await supabase
     .from("medicines")
@@ -51,7 +48,7 @@ export async function getHouseholdMedicines(
 
   return (data ?? []).map((row) => ({
     ...toMedicine(row),
-    patientName: row.patients?.name ?? "",
+    patientName: row.patients.name,
   }))
 }
 
@@ -143,6 +140,8 @@ export interface StockMovement {
     | "dose_reverted"
     | "restock"
     | "owner_edit"
+    | "disposed"
+    | "dispose_reverted"
   actorName: string | null
   createdAt: string
 }

@@ -10,7 +10,10 @@ import {
   SupplyBadge,
   SupplyMeter,
 } from "@/components/medicine-badges"
-import { ArchiveMedicineButton } from "@/components/medicines/medicine-actions"
+import {
+  ArchiveMedicineButton,
+  DisposeMedicineButton,
+} from "@/components/medicines/medicine-actions"
 import { RestockDialog } from "@/components/medicines/restock-dialog"
 import { formatTime12h } from "@/lib/schedule"
 import { formatDosage } from "@/lib/mappers"
@@ -128,6 +131,10 @@ export function CabinetTab({
                       Edit
                     </Link>
                   </Button>
+                  <DisposeMedicineButton
+                    medicineId={medicine.id}
+                    medicineName={medicine.name}
+                  />
                   <ArchiveMedicineButton
                     medicineId={medicine.id}
                     medicineName={medicine.name}

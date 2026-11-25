@@ -4,7 +4,6 @@ import { useState } from "react"
 import {
   Check,
   ClipboardCopy,
-  PillBottle,
   Printer,
   ShoppingBasket,
   TriangleAlert,
@@ -22,20 +21,22 @@ import {
   type PharmacyTag,
 } from "@/lib/pharmacy-list"
 
-const TAG_COPY: Record<
-  PharmacyTag,
-  { label: string; variant: "expired" | "expiring" | "outline" }
-> = {
-  restock: { label: "Restock", variant: "expired" },
-  expiring: { label: "Expiring", variant: "expiring" },
-  expired: { label: "Expired", variant: "expired" },
+const TAG_LABEL: Record<PharmacyTag, string> = {
+  restock: "Restock",
+  expiring: "Expiring",
+  expired: "Expired",
+}
+
+/** Both Restock and Expired read as urgent; only Expiring soon is amber. */
+function badgeVariant(tag: PharmacyTag) {
+  return tag === "expiring" ? "expiring" : "expired"
 }
 
 const SECTIONS: {
   tag: PharmacyTag
   title: string
   description: string
-  icon: typeof PillBottle
+  icon: typeof ShoppingBasket
 }[] = [
   {
     tag: "restock",
@@ -56,14 +57,6 @@ const SECTIONS: {
     icon: TriangleAlert,
   },
 ]
-
-function rowsFor(list: PharmacyList, tag: PharmacyTag): PharmacyRow[] {
-  return tag === "restock"
-    ? list.restock
-    : tag === "expiring"
-      ? list.expiring
-      : list.expired
-}
 
 function PharmacyRowItem({ row }: { row: PharmacyRow }) {
   return (
@@ -87,8 +80,8 @@ function PharmacyRowItem({ row }: { row: PharmacyRow }) {
       {row.tags.length > 1 ? (
         <div className="flex flex-wrap gap-1.5">
           {row.tags.map((tag) => (
-            <Badge key={tag} variant={TAG_COPY[tag].variant}>
-              {TAG_COPY[tag].label}
+            <Badge key={tag} variant={badgeVariant(tag)}>
+              {TAG_LABEL[tag]}
             </Badge>
           ))}
         </div>
@@ -177,7 +170,7 @@ export function PharmacyListPanel({
 
       <div className="space-y-4">
         {SECTIONS.map((section) => {
-          const rows = rowsFor(list, section.tag)
+          const rows = list[section.tag]
           if (rows.length === 0) return null
           return (
             <section
@@ -192,7 +185,7 @@ export function PharmacyListPanel({
                 <div>
                   <h3 className="flex items-center gap-2 font-display text-base font-medium tracking-tight">
                     {section.title}
-                    <Badge variant={TAG_COPY[section.tag].variant}>
+                    <Badge variant={badgeVariant(section.tag)}>
                       {rows.length}
                     </Badge>
                   </h3>

@@ -24,22 +24,22 @@ export interface PharmacyRow {
   action: string
   /** Every reason this medicine is listed, even when it shows under one heading. */
   tags: PharmacyTag[]
-  daysOfSupply: number | null
-  daysUntilExpiry: number
-  expirationDate: string
 }
 
-export interface PharmacyList {
-  restock: PharmacyRow[]
-  expiring: PharmacyRow[]
-  expired: PharmacyRow[]
+/** One array per section, so callers index by tag instead of re-deriving it. */
+export type PharmacyList = Record<PharmacyTag, PharmacyRow[]>
+
+const ACTIONS: Record<PharmacyTag, string> = {
+  restock: "Buy more",
+  expiring: "Ask about a refill before it expires",
+  expired: "Return for disposal",
 }
 
 /**
  * One row per medicine, under the most urgent heading, carrying every tag.
  *
  * Urgency follows the order of the sections on the page: a medicine you must
- * buy is the first thing to do on the trip, an expiring one is a "ask about a
+ * buy is the first thing to do on the trip, an expiring one is an "ask about a
  * refill" errand, and an expired one is a disposal task. So an expired medicine
  * that is also out of stock lands under Restock with both tags, which is what
  * you act on, and the Expired tag still tells you to hand the old pack back.
@@ -50,20 +50,23 @@ function sectionFor(tags: PharmacyTag[]): PharmacyTag {
   return "expired"
 }
 
-/** Restock: days of supply ascending; expiring: soonest first; expired: newest first. */
-function byNumber(
-  read: (row: PharmacyRow) => number | null,
-  direction: 1 | -1,
-) {
-  return (a: PharmacyRow, b: PharmacyRow) => {
-    const left = read(a)
-    const right = read(b)
-    // Unknown supply sorts last: it needs a human look, not a shopping trip.
-    if (left === null && right === null) return a.name.localeCompare(b.name)
-    if (left === null) return 1
-    if (right === null) return -1
-    const delta = (left - right) * direction
-    return delta !== 0 ? delta : a.name.localeCompare(b.name)
+interface Entry {
+  row: PharmacyRow
+  section: PharmacyTag
+  /** Days of supply for Restock, days to expiry otherwise. Null sorts last. */
+  sortKey: number | null
+}
+
+/** Ascending by `direction = 1`, most recent first by `-1`; unknown sorts last. */
+function bySortKey(direction: 1 | -1) {
+  return (a: Entry, b: Entry) => {
+    if (a.sortKey === null && b.sortKey === null) {
+      return a.row.name.localeCompare(b.row.name)
+    }
+    if (a.sortKey === null) return 1
+    if (b.sortKey === null) return -1
+    const delta = (a.sortKey - b.sortKey) * direction
+    return delta !== 0 ? delta : a.row.name.localeCompare(b.row.name)
   }
 }
 
@@ -72,7 +75,7 @@ export function buildPharmacyList(
   todayIso: string,
   now: Date = new Date(),
 ): PharmacyList {
-  const rows: PharmacyRow[] = []
+  const entries: Entry[] = []
 
   for (const medicine of medicines) {
     const supply = calculateSupply(medicine.stock, medicine.frequencyPerDay, now)
@@ -84,56 +87,47 @@ export function buildPharmacyList(
       tags.push("expiring")
     }
     if (remaining < 0) tags.push("expired")
-
     if (tags.length === 0) continue
 
     const section = sectionFor(tags)
-    const detail =
-      section === "restock"
-        ? supply.shortLabel
-        : formatDaysRemaining(medicine.expirationDate, todayIso)
-    const action =
-      section === "restock"
-        ? "Buy more"
-        : section === "expiring"
-          ? "Ask about a refill before it expires"
-          : "Return for disposal"
-
-    rows.push({
-      medicineId: medicine.id,
-      patientId: medicine.patientId,
-      patientName: medicine.patientName,
-      name: medicine.name,
-      dosage: `${formatDosage(medicine.dosageAmount, medicine.dosageUnit)} · ${medicine.frequencyPerDay}× daily`,
-      detail,
-      action,
-      tags,
-      daysOfSupply: supply.daysRemaining,
-      daysUntilExpiry: remaining,
-      expirationDate: medicine.expirationDate,
+    entries.push({
+      section,
+      sortKey: section === "restock" ? supply.daysRemaining : remaining,
+      row: {
+        medicineId: medicine.id,
+        patientId: medicine.patientId,
+        patientName: medicine.patientName,
+        name: medicine.name,
+        dosage: `${formatDosage(medicine.dosageAmount, medicine.dosageUnit)} · ${medicine.frequencyPerDay}× daily`,
+        detail:
+          section === "restock"
+            ? supply.shortLabel
+            : formatDaysRemaining(medicine.expirationDate, todayIso),
+        action: ACTIONS[section],
+        tags,
+      },
     })
   }
 
-  const inSection = (section: PharmacyTag) =>
-    rows.filter((row) => sectionFor(row.tags) === section)
+  const pick = (section: PharmacyTag, direction: 1 | -1) =>
+    entries
+      .filter((entry) => entry.section === section)
+      .sort(bySortKey(direction))
+      .map((entry) => entry.row)
 
-  const restock = inSection("restock").sort(byNumber((row) => row.daysOfSupply, 1))
-  const expiring = inSection("expiring").sort(
-    byNumber((row) => row.daysUntilExpiry, 1),
-  )
-  // Most recently expired first: those are the ones still in the cabinet.
-  const expired = inSection("expired").sort(
-    byNumber((row) => row.daysUntilExpiry, -1),
-  )
-
-  return { restock, expiring, expired }
+  return {
+    restock: pick("restock", 1),
+    expiring: pick("expiring", 1),
+    // Most recently expired first: those are the ones still in the cabinet.
+    expired: pick("expired", -1),
+  }
 }
 
-const SECTION_HEADINGS: { tag: PharmacyTag; heading: string }[] = [
-  { tag: "restock", heading: "RESTOCK" },
-  { tag: "expiring", heading: "EXPIRING SOON" },
-  { tag: "expired", heading: "EXPIRED — RETURN TO THE PHARMACY" },
-]
+const SECTION_HEADINGS: Record<PharmacyTag, string> = {
+  restock: "RESTOCK",
+  expiring: "EXPIRING SOON",
+  expired: "EXPIRED — RETURN TO THE PHARMACY",
+}
 
 /**
  * The copy/print text. Deliberately plain: it is pasted into a note or handed
@@ -144,19 +138,12 @@ export function toPlainText(
   householdName: string,
   todayIso: string,
 ): string {
-  const rowsFor = (tag: PharmacyTag) =>
-    tag === "restock"
-      ? list.restock
-      : tag === "expiring"
-        ? list.expiring
-        : list.expired
-
   const lines = [`MEDIDOSE — PHARMACY LIST · ${todayIso}`, `For: ${householdName}`]
 
-  for (const { tag, heading } of SECTION_HEADINGS) {
-    const rows = rowsFor(tag)
+  for (const tag of ["restock", "expiring", "expired"] as const) {
+    const rows = list[tag]
     if (rows.length === 0) continue
-    lines.push("", heading)
+    lines.push("", SECTION_HEADINGS[tag])
     for (const row of rows) {
       lines.push(
         `- ${row.name} · ${row.patientName} · ${row.detail} · ${row.action}`,
@@ -164,7 +151,7 @@ export function toPlainText(
     }
   }
 
-  if (list.restock.length + list.expiring.length + list.expired.length === 0) {
+  if (countRows(list) === 0) {
     lines.push("", "Nothing needs a pharmacy trip right now.")
   }
 
