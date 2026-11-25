@@ -1,7 +1,7 @@
 "use server"
 
 import { createSupabaseServerClient } from "@/lib/supabase/server"
-import { ownerHouseholdId, requireSession } from "@/lib/auth"
+import { ownerHouseholdId, requireSession, requireStaff } from "@/lib/auth"
 import { fail, mapDbError, ok, type ActionResult } from "@/lib/action-result"
 import { revalidateViews } from "@/lib/revalidate"
 import {
@@ -186,6 +186,11 @@ export async function restockAction(
   medicineId: string,
   quantity: number | string,
 ): Promise<ActionResult<{ stock: number }>> {
+  // A patient-role member is a household member, so the RPC's staff check is
+  // the real boundary; failing here keeps the message out of the database layer.
+  const { context, error: authError } = await requireStaff()
+  if (!context) return fail(authError)
+
   const quantityError = validateRestockQuantity(quantity)
   if (quantityError) return fail(quantityError)
 

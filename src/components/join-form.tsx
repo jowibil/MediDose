@@ -8,8 +8,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { joinHouseholdAction } from "@/lib/actions/household"
+import { claimPatientAction } from "@/lib/actions/patients"
 
-export function JoinForm() {
+/**
+ * One form, two codes: a household invite code (staff) or a patient link code.
+ * They share a shape, an alphabet and a throttle, and differ only in which RPC
+ * redeems them — so the mode changes the words, never the mechanics.
+ */
+export function JoinForm({ mode = "household" }: { mode?: "household" | "patient" }) {
+  const isPatient = mode === "patient"
   const [code, setCode] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [householdName, setHouseholdName] = useState<string | null>(null)
@@ -20,10 +27,14 @@ export function JoinForm() {
       <div className="flex flex-col items-start gap-3">
         <p className="flex items-center gap-2 text-sm font-medium text-sage">
           <Check className="size-4" />
-          You joined {householdName}.
+          {isPatient
+            ? `You’re linked to ${householdName}.`
+            : `You joined ${householdName}.`}
         </p>
         <p className="text-sm text-muted-foreground">
-          Its patients now appear in the top-bar selector.
+          {isPatient
+            ? "Your schedule and dose history are on the dashboard."
+            : "Its patients now appear in the top-bar selector."}
         </p>
         <Button asChild>
           <Link href="/dashboard">Go to dashboard</Link>
@@ -39,7 +50,9 @@ export function JoinForm() {
         event.preventDefault()
         setError(null)
         startTransition(async () => {
-          const result = await joinHouseholdAction(code)
+          const result = isPatient
+            ? await claimPatientAction(code)
+            : await joinHouseholdAction(code)
           if (!result.ok) {
             setError(result.error)
             return
@@ -50,7 +63,7 @@ export function JoinForm() {
     >
       <div>
         <Label htmlFor="invite-code" className="mb-1.5">
-          Invite code
+          {isPatient ? "Link code" : "Invite code"}
         </Label>
         <Input
           id="invite-code"
@@ -83,7 +96,13 @@ export function JoinForm() {
       ) : null}
 
       <Button type="submit" disabled={isPending || code.length !== 6}>
-        {isPending ? "Joining…" : "Join household"}
+        {isPending
+          ? isPatient
+            ? "Linking…"
+            : "Joining…"
+          : isPatient
+            ? "Link my account"
+            : "Join household"}
       </Button>
     </form>
   )

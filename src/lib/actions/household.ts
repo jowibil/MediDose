@@ -107,6 +107,12 @@ export async function joinHouseholdAction(code: string): Promise<JoinResult> {
   const { context, error: authError } = await requireSession()
   if (!context) return { ok: false, error: authError }
 
+  // A patient account belongs to one record in one household and joins nothing.
+  // The RPC would raise ROLE_FIXED after the fact; saying so up front is kinder.
+  if (context.accountType === "patient") {
+    return { ok: false, error: mapDbError({ message: "PATIENT_ACCOUNT_CANNOT_JOIN" }) }
+  }
+
   const formatError = validateInviteCode(code)
   if (formatError) return { ok: false, error: formatError }
 

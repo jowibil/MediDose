@@ -8,9 +8,9 @@ export default async function SignupPage({
   searchParams: Promise<{ role?: string }>
 }) {
   const params = await searchParams
-  return (
-    <SignupForm
-      initialRole={params.role === "caregiver" ? "caregiver" : "owner"}
-    />
-  )
+  const initialRole =
+    params.role === "caregiver" || params.role === "patient"
+      ? params.role
+      : "owner"
+  return <SignupForm initialRole={initialRole} />
 }

@@ -1,3 +1,17 @@
+/**
+ * Household roles are fixed at signup. `patient` is the third one: an account
+ * bound to a single patient record in a single household, with read access to
+ * its own medicines and dose history only.
+ */
+export type HouseholdRole = "owner" | "caregiver" | "patient"
+
+/**
+ * What a patient account resolves to. `not_linked` covers "never claimed",
+ * "unlinked by the owner" and "purged" — all three have the same remedy: ask
+ * the owner for a link code.
+ */
+export type PatientState = "active" | "archived" | "not_linked"
+
 export type DoseUnit = "mg" | "ml"
 
 export type ExpirationStatus = "safe" | "expiring" | "expired"
@@ -87,7 +101,7 @@ export interface PatientOption {
 export interface HouseholdGroup {
   householdId: string
   householdName: string
-  role: "owner" | "caregiver"
+  role: HouseholdRole
   patients: PatientOption[]
 }
 
@@ -95,8 +109,18 @@ export interface SessionContext {
   userId: string
   displayName: string
   email: string
-  role: "owner" | "caregiver"
+  role: HouseholdRole
+  /**
+   * The role chosen at signup. It is a UI routing hint only — the RPCs and RLS
+   * decide what an account may actually do — but it is what lets an unclaimed
+   * patient account still see the link-code form after a refresh.
+   */
+  accountType: HouseholdRole
   households: HouseholdGroup[]
+  /** The patient record bound to this account; null for staff. */
+  selfPatientId: string | null
+  /** Null for staff, who see the household rather than one state. */
+  patientState: PatientState | null
 }
 
 export const MIN_FREQUENCY = 1

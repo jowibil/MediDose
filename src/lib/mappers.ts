@@ -9,7 +9,14 @@ import type {
 import type { Tables } from "@/types/database.types"
 import { normalizeTime } from "@/lib/dates"
 
-export function toPatient(row: Tables<"patients">): Patient {
+// Column-level grants on public.patients exclude user_id and link_code, so the
+// row handed in is whatever the query selected, never the whole table.
+export function toPatient(
+  row: Pick<
+    Tables<"patients">,
+    "id" | "household_id" | "name" | "archived_at" | "created_at"
+  >,
+): Patient {
   return {
     id: row.id,
     householdId: row.household_id,

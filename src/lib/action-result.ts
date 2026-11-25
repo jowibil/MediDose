@@ -31,6 +31,14 @@ const ERROR_MESSAGES: Record<string, string> = {
   INVALID_TIME: "That time isn’t part of this medicine’s schedule.",
   PATIENT_MISMATCH: "That dose doesn’t belong to this patient.",
   ROLE_FIXED: "Account roles can’t be changed after signup.",
+  PATIENT_ALREADY_LINKED:
+    "This account is already linked to a patient record.",
+  PATIENT_NOT_LINKABLE:
+    "That patient record can’t be linked right now. Ask the owner to check it.",
+  NOT_A_PATIENT_ACCOUNT:
+    "This account isn’t a patient account — use the household invite code instead.",
+  PATIENT_ACCOUNT_CANNOT_JOIN:
+    "This is a patient account. Enter your patient link code instead of a household code.",
   NOT_ARCHIVED: "Archive this item before purging it.",
   NOT_CAREGIVER: "That account isn’t a caregiver in this household.",
   NOT_FOUND: "We couldn’t find that item.",

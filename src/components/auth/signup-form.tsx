@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Check, Home, UserRound } from "lucide-react"
+import { Check, HeartHandshake, Home, UserRound } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils"
 import { signUpAction } from "@/lib/actions/auth"
 import { PASSWORD_MIN_LENGTH } from "@/lib/password-policy"
 
-type Role = "owner" | "caregiver"
+type Role = "owner" | "caregiver" | "patient"
 
 export function SignupForm({ initialRole = "owner" }: { initialRole?: Role }) {
   const router = useRouter()
@@ -50,7 +50,12 @@ export function SignupForm({ initialRole = "owner" }: { initialRole?: Role }) {
       // project skips confirmation, otherwise the check-email route, which is
       // a real URL so a refresh cannot drop the waiting state.
       router.push(
-        result.data.redirectTo ?? (role === "owner" ? "/dashboard" : "/join"),
+        result.data.redirectTo ??
+          (role === "owner"
+            ? "/dashboard"
+            : role === "patient"
+              ? "/join?as=patient"
+              : "/join"),
       )
       router.refresh()
     })
@@ -65,7 +70,7 @@ export function SignupForm({ initialRole = "owner" }: { initialRole?: Role }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-5 grid gap-2 sm:grid-cols-2">
+        <div className="mb-5 grid gap-2 sm:grid-cols-3">
           <RoleOption
             active={role === "owner"}
             icon={<Home className="size-4" />}
@@ -75,10 +80,17 @@ export function SignupForm({ initialRole = "owner" }: { initialRole?: Role }) {
           />
           <RoleOption
             active={role === "caregiver"}
-            icon={<UserRound className="size-4" />}
-            title="Join a household"
-            description="Help with doses and restocking with an invite code."
+            icon={<HeartHandshake className="size-4" />}
+            title="Help a household"
+            description="Log doses and restock with an invite code."
             onClick={() => setRole("caregiver")}
+          />
+          <RoleOption
+            active={role === "patient"}
+            icon={<UserRound className="size-4" />}
+            title="I’m a patient"
+            description="See your own medicines and dose history with a link code."
+            onClick={() => setRole("patient")}
           />
         </div>
 
@@ -172,7 +184,9 @@ export function SignupForm({ initialRole = "owner" }: { initialRole?: Role }) {
               ? "Creating account…"
               : role === "owner"
                 ? "Create household account"
-                : "Create caregiver account"}
+                : role === "patient"
+                  ? "Create patient account"
+                  : "Create caregiver account"}
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">

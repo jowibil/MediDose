@@ -2,17 +2,29 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Check, Copy, Pencil, RefreshCcw, UserMinus, X } from "lucide-react"
+import {
+  Check,
+  Copy,
+  Link2,
+  Pencil,
+  RefreshCcw,
+  Unlink,
+  UserMinus,
+  X,
+} from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   archivePatientAction,
+  generatePatientLinkCodeAction,
   purgePatientAction,
   renamePatientAction,
   restorePatientAction,
+  unlinkPatientAction,
 } from "@/lib/actions/patients"
 import {
   purgeMedicineAction,
@@ -226,10 +238,20 @@ export function CaregiverRemoveButton({
   )
 }
 
+export interface PatientLinkState {
+  status: "linked" | "code" | "none"
+  code: string | null
+}
+
 export function PatientAdminList({
   patients,
 }: {
-  patients: { id: string; name: string; medicineCount: number }[]
+  patients: {
+    id: string
+    name: string
+    medicineCount: number
+    link: PatientLinkState
+  }[]
 }) {
   const router = useRouter()
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -291,6 +313,7 @@ export function PatientAdminList({
                       {patient.medicineCount} medicine
                       {patient.medicineCount === 1 ? "" : "s"}
                     </span>
+                    <PatientLinkControl patient={patient} />
                     <Button
                       size="sm"
                       variant="ghost"
@@ -355,6 +378,111 @@ export function PatientAdminList({
         </p>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * Owner-side account link for one patient: mint a code, show the live one, or
+ * detach an account. `patients.user_id` and `link_code` are unreadable here, so
+ * the state arrives from the owner-only RPCs in src/lib/data.ts.
+ */
+function PatientLinkControl({
+  patient,
+}: {
+  patient: { id: string; name: string; link: PatientLinkState }
+}) {
+  const router = useRouter()
+  const [status, setStatus] = useState(patient.link.status)
+  const [code, setCode] = useState(patient.link.code)
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  if (status === "linked") {
+    return (
+      <span className="flex items-center gap-1">
+        <Badge variant="safe">Account linked</Badge>
+        <ConfirmDialog
+          trigger={
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={`Unlink ${patient.name}`}
+            >
+              <Unlink className="size-4" />
+            </Button>
+          }
+          title="Unlink this account?"
+          description={`${patient.name} loses access immediately. Their dose history stays, and you can mint a new link code later.`}
+          confirmLabel="Unlink account"
+          onConfirm={async () => {
+            const result = await unlinkPatientAction(patient.id)
+            if (result.ok) {
+              setStatus("none")
+              setCode(null)
+              router.refresh()
+            }
+            return result
+          }}
+        />
+      </span>
+    )
+  }
+
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      {status === "code" && code ? (
+        <>
+          <code className="rounded-lg border border-border/60 bg-muted/40 px-2 py-1 font-mono text-xs tracking-[0.2em]">
+            {code}
+          </code>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(code)
+                setCopied(true)
+                window.setTimeout(() => setCopied(false), 2000)
+              } catch {
+                setCopied(false)
+              }
+            }}
+          >
+            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+            {copied ? "Copied" : "Copy"}
+          </Button>
+        </>
+      ) : null}
+
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={isPending}
+        onClick={() => {
+          setError(null)
+          startTransition(async () => {
+            const result = await generatePatientLinkCodeAction(patient.id)
+            if (!result.ok) {
+              setError(result.error)
+              return
+            }
+            setCode(result.data.code)
+            setStatus("code")
+            router.refresh()
+          })
+        }}
+      >
+        <Link2 className="size-4" />
+        {status === "code" ? "New code" : "Link account"}
+      </Button>
+
+      {error ? (
+        <span role="alert" className="text-xs text-destructive">
+          {error}
+        </span>
+      ) : null}
+    </span>
   )
 }
 

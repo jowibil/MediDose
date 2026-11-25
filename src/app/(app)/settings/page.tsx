@@ -9,7 +9,9 @@ import {
   getCaregivers,
   getInviteCode,
   getMedicines,
+  getPatientLinkInfo,
   getPatients,
+  type PatientLinkInfo,
 } from "@/lib/data"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -46,6 +48,9 @@ function formatJoined(iso: string): string {
 export default async function SettingsPage() {
   const context = await getSessionContext()
   if (!context) redirect("/login")
+  // Settings is an owner surface. A patient account is redirected server-side
+  // rather than shown an empty shell it has no actions for.
+  if (context.role === "patient") redirect("/dashboard")
 
   const householdId = ownerHouseholdId(context)
 
@@ -150,6 +155,13 @@ export default async function SettingsPage() {
   const medicineCountByPatient = new Map(
     medicineLists.map((entry) => [entry.patientId, entry.medicines.length]),
   )
+  const linkInfos = await Promise.all(
+    activePatients.map(
+      async (patient) =>
+        [patient.id, await getPatientLinkInfo(patient.id)] as const,
+    ),
+  )
+  const linkInfoByPatient = new Map<string, PatientLinkInfo>(linkInfos)
   const medicineNameByPatient = new Map(
     [...patients, ...archivedPatients].map((patient) => [
       patient.id,
@@ -260,6 +272,10 @@ export default async function SettingsPage() {
               id: patient.id,
               name: patient.name,
               medicineCount: medicineCountByPatient.get(patient.id) ?? 0,
+              link: linkInfoByPatient.get(patient.id) ?? {
+                status: "none" as const,
+                code: null,
+              },
             }))}
           />
         </CardContent>

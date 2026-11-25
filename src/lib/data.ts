@@ -4,6 +4,12 @@ import type { Medicine, Patient } from "@/types/medicine"
 import type { DoseLogRow } from "@/lib/occurrences"
 
 /**
+ * `*` needs a table-level SELECT grant; public.patients has column grants only
+ * (link_code and user_id are owner-only through RPCs). List what the UI reads.
+ */
+const PATIENT_COLUMNS = "id, household_id, name, archived_at, created_at"
+
+/**
  * Medicines for one patient, ordered by name. `includeArchived` keeps past
  * dose history readable. Household scoping is intentionally left to RLS: the
  * policies already restrict rows to households the caller belongs to.
@@ -57,7 +63,7 @@ export async function getArchivedPatients(
   const supabase = await createSupabaseServerClient()
   const { data } = await supabase
     .from("patients")
-    .select("*")
+    .select(PATIENT_COLUMNS)
     .eq("household_id", householdId)
     .not("archived_at", "is", null)
     .order("name", { ascending: true })
@@ -195,11 +201,40 @@ export async function getInviteCode(householdId: string): Promise<string | null>
   return typeof data === "string" ? data : null
 }
 
+export type PatientLinkStatus = "linked" | "code" | "none"
+
+export interface PatientLinkInfo {
+  status: PatientLinkStatus
+  code: string | null
+}
+
+/**
+ * Owner-only link state for one patient, read through RPCs because
+ * patients.user_id and patients.link_code are outside the column grant.
+ */
+export async function getPatientLinkInfo(
+  patientId: string,
+): Promise<PatientLinkInfo> {
+  const supabase = await createSupabaseServerClient()
+  const { data: status } = await supabase.rpc("patient_link_status", {
+    p_patient_id: patientId,
+  })
+  const value: PatientLinkStatus =
+    status === "linked" || status === "code" ? status : "none"
+
+  if (value !== "code") return { status: value, code: null }
+
+  const { data: code } = await supabase.rpc("get_patient_link_code", {
+    p_patient_id: patientId,
+  })
+  return { status: value, code: typeof code === "string" ? code : null }
+}
+
 export async function getPatients(householdId: string): Promise<Patient[]> {
   const supabase = await createSupabaseServerClient()
   const { data } = await supabase
     .from("patients")
-    .select("*")
+    .select(PATIENT_COLUMNS)
     .eq("household_id", householdId)
     .order("name", { ascending: true })
   return (data ?? []).map((row) => toPatient(row))

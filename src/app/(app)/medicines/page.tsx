@@ -29,6 +29,9 @@ export default async function MedicinesPage({
 
   const context = await getSessionContext()
   if (!context) redirect("/login")
+  // A patient account has no cabinet to manage; the nav hides this route, and
+  // the server enforces it so a typed URL is not a way in.
+  if (context.role === "patient") redirect("/dashboard")
 
   const active = await resolveActivePatient(context)
   if (!active) return <NoPatientState context={context} />

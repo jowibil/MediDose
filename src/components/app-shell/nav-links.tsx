@@ -10,20 +10,23 @@ import {
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import type { HouseholdRole } from "@/types/medicine"
 
-const LINKS = [
-  { href: "/dashboard", label: "Today", icon: CalendarClock },
-  { href: "/medicines", label: "Medicines", icon: ClipboardList },
-  { href: "/history", label: "History", icon: History },
-] as const
+const TODAY = { href: "/dashboard", label: "Today", icon: CalendarClock }
+const MEDICINES = { href: "/medicines", label: "Medicines", icon: ClipboardList }
+const HISTORY = { href: "/history", label: "History", icon: History }
+const SETTINGS = { href: "/settings", label: "Settings", icon: Settings }
 
-export function NavLinks({ role }: { role: "owner" | "caregiver" }) {
+/** A patient has no cabinet to manage and no settings to change. */
+const LINKS_BY_ROLE = {
+  owner: [TODAY, MEDICINES, HISTORY, SETTINGS],
+  caregiver: [TODAY, MEDICINES, HISTORY],
+  patient: [TODAY, HISTORY],
+} as const
+
+export function NavLinks({ role }: { role: HouseholdRole }) {
   const pathname = usePathname()
-
-  const links =
-    role === "owner"
-      ? [...LINKS, { href: "/settings", label: "Settings", icon: Settings }]
-      : [...LINKS]
+  const links = LINKS_BY_ROLE[role]
 
   return (
     <nav

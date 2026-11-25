@@ -3,6 +3,7 @@ import { CalendarClock, PackageCheck, Plus, TriangleAlert } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { ActivePatient } from "@/lib/auth"
+import type { HouseholdRole } from "@/types/medicine"
 
 const FACTS = [
   {
@@ -24,7 +25,7 @@ export function WelcomeView({
   role,
 }: {
   active: ActivePatient
-  role: "owner" | "caregiver"
+  role: HouseholdRole
 }) {
   return (
     <section
@@ -53,6 +54,11 @@ export function WelcomeView({
               <Plus aria-hidden="true" className="size-4" /> Add your first medicine
             </Link>
           </Button>
+        ) : role === "patient" ? (
+          <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            No medicines yet. Your household owner adds them; your schedule and
+            dose history appear here as soon as they do.
+          </p>
         ) : (
           <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
             No medicines yet. Your household owner can add them; you’ll be able to

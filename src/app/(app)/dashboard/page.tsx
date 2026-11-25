@@ -303,6 +303,7 @@ export default async function DashboardPage() {
                               occurrence={occurrence}
                               stock={medicine.stock}
                               timeZone={timeZone}
+                              role={context.role}
                             />
                           </li>
                         )

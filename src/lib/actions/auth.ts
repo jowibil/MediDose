@@ -49,7 +49,7 @@ export async function signInAction(input: {
 }
 
 export async function signUpAction(input: {
-  role: "owner" | "caregiver"
+  role: "owner" | "caregiver" | "patient"
   displayName: string
   householdName: string
   email: string
@@ -77,7 +77,12 @@ export async function signUpAction(input: {
   }
 
   const origin = await getSiteUrl()
-  const next = input.role === "owner" ? "/dashboard" : "/join"
+  const next =
+    input.role === "owner"
+      ? "/dashboard"
+      : input.role === "patient"
+        ? "/join?as=patient"
+        : "/join"
 
   const supabase = await createSupabaseServerClient()
   const { data, error } = await supabase.auth.signUp({
@@ -121,13 +126,18 @@ export async function signUpAction(input: {
  */
 export async function resendConfirmationAction(input: {
   email: string
-  role?: "owner" | "caregiver"
+  role?: "owner" | "caregiver" | "patient"
 }): Promise<AuthResult> {
   const email = input.email.trim()
   if (!email) return { ok: false, error: "Enter your email address." }
 
   const origin = await getSiteUrl()
-  const next = input.role === "caregiver" ? "/join" : "/dashboard"
+  const next =
+    input.role === "caregiver"
+      ? "/join"
+      : input.role === "patient"
+        ? "/join?as=patient"
+        : "/dashboard"
   const supabase = await createSupabaseServerClient()
 
   await supabase.auth.resend({

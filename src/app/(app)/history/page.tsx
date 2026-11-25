@@ -382,6 +382,7 @@ export default async function HistoryPage({
                         occurrence={occurrence}
                         stock={medicine.stock}
                         timeZone={timeZone}
+                        role={context.role}
                       />
                     </li>
                   )

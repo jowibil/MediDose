@@ -26,7 +26,10 @@ export default async function CheckEmailPage({
 
   const email =
     typeof params.email === "string" ? params.email.trim().slice(0, 254) : ""
-  const role = params.role === "caregiver" ? "caregiver" : "owner"
+  const role =
+    params.role === "caregiver" || params.role === "patient"
+      ? params.role
+      : "owner"
 
   return <CheckEmailPanel email={email} role={role} />
 }

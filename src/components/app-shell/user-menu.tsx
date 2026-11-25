@@ -13,6 +13,14 @@ import {
 } from "@/components/ui/popover"
 import { RoleBadge } from "@/components/app-shell/role-badge"
 import { signOutAction } from "@/lib/actions/auth"
+import type { HouseholdRole } from "@/types/medicine"
+
+const ROLE_COPY: Record<HouseholdRole, string> = {
+  owner: "You manage this household — patients, medicines, and caregiver access.",
+  caregiver: "You can log doses and restock. An owner manages medicines and settings.",
+  patient:
+    "You see your own medicines and dose history. Ask a caregiver to correct a dose.",
+}
 
 export function UserMenu({
   displayName,
@@ -21,7 +29,7 @@ export function UserMenu({
 }: {
   displayName: string
   email: string
-  role: "owner" | "caregiver"
+  role: HouseholdRole
 }) {
   return (
     <Popover>
@@ -50,9 +58,7 @@ export function UserMenu({
           <RoleBadge role={role} />
         </div>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {role === "owner"
-            ? "You manage this household — patients, medicines, and caregiver access."
-            : "You can log doses and restock. An owner manages medicines and settings."}
+          {ROLE_COPY[role]}
         </p>
         <form action={signOutAction} className="pt-1">
           <Button

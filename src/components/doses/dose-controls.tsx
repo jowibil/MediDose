@@ -17,6 +17,7 @@ import type { ActionResult } from "@/lib/action-result"
 import {
   skipReasonLabel,
   type DoseOccurrence,
+  type HouseholdRole,
   type SkipReason,
 } from "@/types/medicine"
 
@@ -24,11 +25,17 @@ export function DoseControls({
   occurrence,
   stock,
   timeZone,
+  role,
 }: {
   occurrence: DoseOccurrence
   stock: number
   timeZone: string
+  role: HouseholdRole
 }) {
+  // A patient may record a dose but never revise one: re-marking taken →
+  // skipped returns stock, which is a caregiver's job. The persistent line
+  // below replaces the undo control, and the database refuses the call anyway.
+  const isPatient = role === "patient"
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -152,6 +159,12 @@ export function DoseControls({
             </Badge>
           )}
 
+          {isPatient ? (
+            <p className="max-w-64 text-[11px] leading-relaxed text-muted-foreground">
+              {occurrence.status === "taken" ? "Marked taken." : "Marked skipped."}{" "}
+              Ask a caregiver to correct it if this was a mistake.
+            </p>
+          ) : (
           <div className="flex items-center gap-1">
             {occurrence.status === "skipped" ? (
               <Button
@@ -187,19 +200,26 @@ export function DoseControls({
               {occurrence.status === "skipped" ? "Change reason" : "Skip instead"}
             </Button>
           </div>
+          )}
         </div>
       )}
 
       {pending && outOfStock ? (
         <p id="dose-out-of-stock" className="text-[11px] text-muted-foreground">
-          No doses left.{" "}
-          <Link
-            href="/medicines?tab=inventory"
-            className="font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
-          >
-            Restock
-          </Link>{" "}
-          or log this dose as skipped.
+          {isPatient ? (
+            <>No doses left. Log this dose as skipped or ask a caregiver to restock.</>
+          ) : (
+            <>
+              No doses left.{" "}
+              <Link
+                href="/medicines?tab=inventory"
+                className="font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+              >
+                Restock
+              </Link>{" "}
+              or log this dose as skipped.
+            </>
+          )}
         </p>
       ) : null}
 

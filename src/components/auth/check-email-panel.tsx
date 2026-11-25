@@ -21,7 +21,7 @@ export function CheckEmailPanel({
   role,
 }: {
   email: string
-  role: "owner" | "caregiver"
+  role: "owner" | "caregiver" | "patient"
 }) {
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
@@ -63,7 +63,12 @@ export function CheckEmailPanel({
     })
   }
 
-  const signupHref = role === "caregiver" ? "/signup?role=caregiver" : "/signup"
+  const signupHref =
+    role === "caregiver"
+      ? "/signup?role=caregiver"
+      : role === "patient"
+        ? "/signup?role=patient"
+        : "/signup"
 
   return (
     <Card>
@@ -90,7 +95,9 @@ export function CheckEmailPanel({
             an hour.
             {role === "caregiver"
               ? " After confirming, sign in and join your household with the invite code."
-              : " After confirming, sign in to set up your household."}
+              : role === "patient"
+                ? " After confirming, sign in and enter the link code your household owner gave you."
+                : " After confirming, sign in to set up your household."}
           </p>
 
           {notice ? (

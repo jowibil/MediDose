@@ -3,6 +3,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { fail, mapDbError, ok, type ActionResult } from "@/lib/action-result"
 import { revalidateViews } from "@/lib/revalidate"
+import { requireStaff } from "@/lib/auth"
 import { validateSkipInput } from "@/lib/validation"
 import { getTimeZone } from "@/lib/timezone"
 
@@ -66,6 +67,11 @@ export async function updateDoseStatusAction(input: {
   reason?: string | null
   note?: string | null
 }): Promise<ActionResult> {
+  // The self-correction boundary: a patient may log a dose, never revise one.
+  // update_dose_status() enforces the same rule; this gives the clearer error.
+  const { context, error: authError } = await requireStaff()
+  if (!context) return fail(authError)
+
   let reason: string | null = null
   let note: string | null = null
 
