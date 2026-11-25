@@ -10,6 +10,18 @@ import {
 } from "@/types/medicine"
 import { isValidISODate, isValidTime, isPastDate } from "@/lib/dates"
 
+export const MAX_ASSISTANT_QUESTION_LENGTH = 500
+
+/** The assistant's only input is this question; validate before spending a call. */
+export function validateAssistantQuestion(value: string): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) return "Type a question first."
+  if (trimmed.length > MAX_ASSISTANT_QUESTION_LENGTH) {
+    return `Keep the question under ${MAX_ASSISTANT_QUESTION_LENGTH} characters.`
+  }
+  return null
+}
+
 export interface MedicineFormValues {
   name: string
   patientId: string

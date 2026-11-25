@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 
 import { getSessionContext, resolveActivePatient } from "@/lib/auth"
 import { getTimeZone } from "@/lib/timezone"
+import { getLanguage } from "@/lib/language-server"
 import { AppShell } from "@/components/app-shell/app-shell"
 
 export default async function AppLayout({
@@ -15,13 +16,19 @@ export default async function AppLayout({
     redirect("/login")
   }
 
-  const [active, timeZone] = await Promise.all([
+  const [active, timeZone, language] = await Promise.all([
     resolveActivePatient(context),
     getTimeZone(),
+    getLanguage(),
   ])
 
   return (
-    <AppShell context={context} active={active} timeZone={timeZone}>
+    <AppShell
+      context={context}
+      active={active}
+      timeZone={timeZone}
+      language={language}
+    >
       {children}
     </AppShell>
   )

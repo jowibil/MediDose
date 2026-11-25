@@ -9,16 +9,20 @@ import { RoleBadge } from "@/components/app-shell/role-badge"
 import { TimezoneSync } from "@/components/app-shell/timezone-sync"
 import { UserMenu } from "@/components/app-shell/user-menu"
 import { MedicalDisclaimer } from "@/components/medical-disclaimer"
+import { AssistantLauncher } from "@/components/assistant/assistant-launcher"
+import type { Language } from "@/lib/language"
 
 export function AppShell({
   context,
   active,
   timeZone,
+  language,
   children,
 }: {
   context: SessionContext
   active: ActivePatient | null
   timeZone: string
+  language: Language
   children: React.ReactNode
 }) {
   return (
@@ -55,6 +59,8 @@ export function AppShell({
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 md:px-6 md:py-10">
         {children}
       </main>
+
+      <AssistantLauncher language={language} />
 
       <footer className="mt-auto border-t border-border/70">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 px-4 py-6 text-muted-foreground md:px-6">

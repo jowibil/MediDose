@@ -146,7 +146,17 @@ export async function archiveMedicineAction(
     .eq("id", medicineId)
 
   if (error) return fail(mapDbError(error))
+
+  // A finished prescription must not depress this week's adherence for doses
+  // nobody could take: drop its future frozen slots, keep the past ones.
+  const todayIso = getTodayInTimeZone(await getTimeZone())
+  await supabase.rpc("remove_future_expected", {
+    p_medicine_id: medicineId,
+    p_today: todayIso,
+  })
+
   revalidateViews("medicine")
+  revalidateViews("summary")
   return ok(null)
 }
 

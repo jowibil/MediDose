@@ -9,6 +9,7 @@ const VIEWS = {
   dose: ["/dashboard", "/medicines", "/history"],
   medicine: ["/dashboard", "/medicines", "/history", "/settings"],
   patient: ["/dashboard", "/medicines", "/history", "/settings", "/join"],
+  summary: ["/summaries"],
 } as const
 
 export type RevalidateScope = keyof typeof VIEWS

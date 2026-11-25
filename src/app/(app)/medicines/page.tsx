@@ -4,7 +4,12 @@ import { Plus } from "lucide-react"
 
 import { getSessionContext, resolveActivePatient } from "@/lib/auth"
 import { getTimeZone } from "@/lib/timezone"
-import { getMedicines, getStockMovements } from "@/lib/data"
+import {
+  getHouseholdMedicines,
+  getMedicines,
+  getStockMovements,
+} from "@/lib/data"
+import { buildPharmacyList } from "@/lib/pharmacy-list"
 import { getTodayInTimeZone, parseISODate } from "@/lib/dates"
 import { PageHeader } from "@/components/page-header"
 import { NoPatientState } from "@/components/no-patient-state"
@@ -16,6 +21,7 @@ import {
 import { CabinetTab } from "@/components/medicines/cabinet-tab"
 import { InventoryTab } from "@/components/medicines/inventory-tab"
 import { ExpirationTab } from "@/components/medicines/expiration-tab"
+import { PharmacyListPanel } from "@/components/medicines/pharmacy-list-panel"
 
 export const metadata = { title: "Medicines" }
 
@@ -40,7 +46,18 @@ export default async function MedicinesPage({
   const todayIso = getTodayInTimeZone(timeZone)
   const now = parseISODate(todayIso)
   const medicines = await getMedicines(active.id)
-  const movements = await getStockMovements(medicines)
+  // The pharmacy list is the one household-wide view: one trip covers every
+  // patient in it, so it queries across them rather than the active patient.
+  const pharmacyList =
+    tab === "pharmacy"
+      ? buildPharmacyList(
+          await getHouseholdMedicines(active.householdId),
+          todayIso,
+          now,
+        )
+      : null
+  const movements =
+    tab === "inventory" ? await getStockMovements(medicines) : []
 
   return (
     <div>
@@ -85,6 +102,14 @@ export default async function MedicinesPage({
           medicines={medicines}
           role={context.role}
           now={now}
+          todayIso={todayIso}
+        />
+      ) : null}
+
+      {tab === "pharmacy" && pharmacyList ? (
+        <PharmacyListPanel
+          list={pharmacyList}
+          householdName={active.householdName}
           todayIso={todayIso}
         />
       ) : null}

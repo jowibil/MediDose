@@ -6,6 +6,7 @@ const TABS = [
   { value: "cabinet", label: "Cabinet" },
   { value: "inventory", label: "Inventory" },
   { value: "expiration", label: "Expiration" },
+  { value: "pharmacy", label: "Pharmacy" },
 ] as const
 
 export type MedicinesTab = (typeof TABS)[number]["value"]
@@ -18,6 +19,7 @@ export function MedicinesTabs({ active }: { active: MedicinesTab }) {
   return (
     <nav
       aria-label="Medicine sections"
+      data-print="hide"
       className="mb-5 flex h-11 w-full items-center gap-1 overflow-x-auto border-b border-border/80 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:h-10 md:w-fit"
     >
       {TABS.map((tab) => {

@@ -27,7 +27,27 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "dose_logs": {
+            "ai_usage": {
+                  Row: {
+                    "count": number,"day": string,"last_request_at": string | null,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "count"?: number,"day": string,"last_request_at"?: string | null,"user_id": string
+                  }
+                  Update: {
+                    "count"?: number,"day"?: string,"last_request_at"?: string | null,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "ai_usage_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"dose_logs": {
                   Row: {
                     "id": string,"last_modified_by": string | null,"logged_at": string,"logged_by": string | null,"medicine_id": string,"patient_id": string,"scheduled_date": string,"scheduled_for": string,"scheduled_time": string,"skip_note": string | null,"skip_reason": Database["public"]['Enums']["skip_reason"] | null,"status": Database["public"]['Enums']["dose_status"],"timezone": string,"updated_at": string
                   }
@@ -65,6 +85,32 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"expected_doses": {
+                  Row: {
+                    "id": string,"medicine_id": string | null,"medicine_name": string,"patient_id": string,"scheduled_date": string,"scheduled_time": string,"week_start": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "id"?: string,"medicine_id"?: string | null,"medicine_name": string,"patient_id": string,"scheduled_date": string,"scheduled_time": string,"week_start": string
+                  }
+                  Update: {
+                    "id"?: string,"medicine_id"?: string | null,"medicine_name"?: string,"patient_id"?: string,"scheduled_date"?: string,"scheduled_time"?: string,"week_start"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "expected_doses_medicine_id_fkey"
+      columns: ["medicine_id"]
+isOneToOne: false
+      referencedRelation: "medicines"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "expected_doses_patient_id_fkey"
+      columns: ["patient_id"]
+isOneToOne: false
+      referencedRelation: "patients"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"household_members": {
                   Row: {
                     "created_at": string,"household_id": string,"role": Database["public"]['Enums']["household_role"],"user_id": string
@@ -93,14 +139,14 @@ isOneToOne: false
                   ]
                 },"households": {
                   Row: {
-                    "created_at": string,"created_by": string | null,"id": string,"invite_code": string,"name": string,"updated_at": string
+                    "created_at": string,"created_by": string | null,"id": string,"invite_code": string,"name": string,"timezone": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_code": string,"name": string,"updated_at"?: string
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_code": string,"name": string,"timezone"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_code"?: string,"name"?: string,"updated_at"?: string
+                    "created_at"?: string,"created_by"?: string | null,"id"?: string,"invite_code"?: string,"name"?: string,"timezone"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -229,6 +275,64 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"week_plans": {
+                  Row: {
+                    "created_at": string,"patient_id": string,"timezone": string,"week_start": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"patient_id": string,"timezone"?: string,"week_start": string
+                  }
+                  Update: {
+                    "created_at"?: string,"patient_id"?: string,"timezone"?: string,"week_start"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "week_plans_patient_id_fkey"
+      columns: ["patient_id"]
+isOneToOne: false
+      referencedRelation: "patients"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"weekly_summaries": {
+                  Row: {
+                    "adherence_rate": number | null,"expected_count": number,"expiring": NonNullable<Json>,"generated_at": string,"generated_by": string | null,"household_id": string,"id": string,"is_reviewed": boolean,"low_stock": NonNullable<Json>,"model": string | null,"patient_id": string,"plan_tracked": boolean,"removed_midweek": NonNullable<Json>,"reviewed_at": string | null,"reviewed_by": string | null,"skipped_by_reason": NonNullable<Json>,"skipped_count": number,"summary_en": string | null,"summary_fil": string | null,"taken_count": number,"timezone": string,"unscheduled_count": number,"week_end": string,"week_start": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "adherence_rate"?: number | null,"expected_count"?: number,"expiring"?: NonNullable<Json>,"generated_at"?: string,"generated_by"?: string | null,"household_id": string,"id"?: string,"is_reviewed"?: boolean,"low_stock"?: NonNullable<Json>,"model"?: string | null,"patient_id": string,"plan_tracked"?: boolean,"removed_midweek"?: NonNullable<Json>,"reviewed_at"?: string | null,"reviewed_by"?: string | null,"skipped_by_reason"?: NonNullable<Json>,"skipped_count"?: number,"summary_en"?: string | null,"summary_fil"?: string | null,"taken_count"?: number,"timezone"?: string,"unscheduled_count"?: number,"week_end": string,"week_start": string
+                  }
+                  Update: {
+                    "adherence_rate"?: number | null,"expected_count"?: number,"expiring"?: NonNullable<Json>,"generated_at"?: string,"generated_by"?: string | null,"household_id"?: string,"id"?: string,"is_reviewed"?: boolean,"low_stock"?: NonNullable<Json>,"model"?: string | null,"patient_id"?: string,"plan_tracked"?: boolean,"removed_midweek"?: NonNullable<Json>,"reviewed_at"?: string | null,"reviewed_by"?: string | null,"skipped_by_reason"?: NonNullable<Json>,"skipped_count"?: number,"summary_en"?: string | null,"summary_fil"?: string | null,"taken_count"?: number,"timezone"?: string,"unscheduled_count"?: number,"week_end"?: string,"week_start"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "weekly_summaries_generated_by_fkey"
+      columns: ["generated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "weekly_summaries_household_id_fkey"
+      columns: ["household_id"]
+isOneToOne: false
+      referencedRelation: "households"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "weekly_summaries_patient_id_fkey"
+      columns: ["patient_id"]
+isOneToOne: false
+      referencedRelation: "patients"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "weekly_summaries_reviewed_by_fkey"
+      columns: ["reviewed_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -238,6 +342,9 @@ isOneToOne: false
             "archive_patient":
 { Args: { "p_patient_id": string }; Returns: undefined
                            },
+"begin_ai_request":
+{ Args: { "p_cooldown_seconds"?: number,"p_daily_limit"?: number }; Returns: string
+                           },
 "can_view_medicine":
 { Args: { "mid": string }; Returns: boolean
                            },
@@ -246,6 +353,12 @@ isOneToOne: false
                            },
 "claim_patient":
 { Args: { "p_code": string }; Returns: string
+                           },
+"consume_ai_quota":
+{ Args: { "p_limit"?: number }; Returns: boolean
+                           },
+"freeze_week":
+{ Args: { "p_patient_id": string,"p_slots": Json,"p_timezone": string,"p_week_start": string }; Returns: boolean
                            },
 "generate_invite_code":
 { Args: Record<PropertyKey, never>; Returns: string
@@ -295,14 +408,23 @@ isOneToOne: false
 "remove_caregiver":
 { Args: { "p_household_id": string,"p_user_id": string }; Returns: undefined
                            },
+"remove_future_expected":
+{ Args: { "p_medicine_id": string,"p_today": string }; Returns: number
+                           },
 "restock_medicine":
 { Args: { "p_medicine_id": string,"p_quantity": number }; Returns: number
+                           },
+"save_weekly_summary":
+{ Args: { "p_patient_id": string,"p_payload": Json,"p_week_start": string }; Returns: string
                            },
 "self_patient_id":
 { Args: Record<PropertyKey, never>; Returns: string
                            },
 "set_patient_link_code":
 { Args: { "p_patient_id": string }; Returns: string
+                           },
+"set_summary_reviewed":
+{ Args: { "p_reviewed": boolean,"p_summary_id": string }; Returns: undefined
                            },
 "shares_household_with":
 { Args: { "uid": string }; Returns: boolean

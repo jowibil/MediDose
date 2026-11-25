@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   CalendarClock,
   ClipboardList,
+  FileClock,
   History,
   Settings,
 } from "lucide-react"
@@ -15,12 +16,13 @@ import type { HouseholdRole } from "@/types/medicine"
 const TODAY = { href: "/dashboard", label: "Today", icon: CalendarClock }
 const MEDICINES = { href: "/medicines", label: "Medicines", icon: ClipboardList }
 const HISTORY = { href: "/history", label: "History", icon: History }
+const SUMMARIES = { href: "/summaries", label: "Summaries", icon: FileClock }
 const SETTINGS = { href: "/settings", label: "Settings", icon: Settings }
 
 /** A patient has no cabinet to manage and no settings to change. */
 const LINKS_BY_ROLE = {
-  owner: [TODAY, MEDICINES, HISTORY, SETTINGS],
-  caregiver: [TODAY, MEDICINES, HISTORY],
+  owner: [TODAY, MEDICINES, HISTORY, SUMMARIES, SETTINGS],
+  caregiver: [TODAY, MEDICINES, HISTORY, SUMMARIES],
   patient: [TODAY, HISTORY],
 } as const
 

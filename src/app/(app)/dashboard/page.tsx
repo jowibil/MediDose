@@ -4,6 +4,8 @@ import { CalendarClock, Check, Clock3, PackageX, TriangleAlert } from "lucide-re
 
 import { getSessionContext, resolveActivePatient } from "@/lib/auth"
 import { getTimeZone } from "@/lib/timezone"
+import { currentWeekStart } from "@/lib/summary"
+import { ensureWeekFrozen } from "@/lib/actions/summaries"
 import { getDoseLogs, getDisplayNames, getMedicines } from "@/lib/data"
 import {
   addISODays,
@@ -40,6 +42,10 @@ export default async function DashboardPage() {
   const timeZone = await getTimeZone()
   const todayIso = getTodayInTimeZone(timeZone)
   const endIso = addISODays(todayIso, 6)
+
+  // Freeze the current week on first visit, for every role. Idempotent, and it
+  // never blocks the page: a failure leaves the week unfrozen, not broken.
+  await ensureWeekFrozen(active.id, currentWeekStart(todayIso), timeZone)
   const medicines = await getMedicines(active.id)
 
   if (medicines.length === 0) {

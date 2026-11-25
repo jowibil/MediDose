@@ -286,3 +286,40 @@
     animation: none !important;
   }
 }
+
+/*
+ * Print: the pharmacy list is the only thing that should reach the paper.
+ * The shell (header/footer), the medicine tabs, and every button step aside.
+ */
+@media print {
+  [data-print="hide"],
+  header,
+  footer,
+  nav[aria-label="Medicine sections"],
+  button {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  main {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .pharmacy-section {
+    border-color: #c8c8c8 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  .pharmacy-section,
+  .pharmacy-row {
+    break-inside: avoid;
+  }
+}
