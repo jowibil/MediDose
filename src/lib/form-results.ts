@@ -1,20 +1,17 @@
+import type { ActionFailure, ActionResult } from "@/lib/action-result"
 import type { MedicineFormErrors } from "@/lib/validation"
 
+/** The success arm of `ActionResult`, without the generic failure member. */
+type MedicineSaved = Extract<ActionResult<{ id: string }>, { ok: true }>
+
 export type SaveMedicineResult =
-  | { ok: true; data: { id: string } }
-  | { ok: false; error: string; fieldErrors?: MedicineFormErrors }
+  | MedicineSaved
+  | (ActionFailure & { fieldErrors?: MedicineFormErrors })
 
-export type AuthResult =
-  | {
-      ok: true
-      data: {
-        message?: string
-        /** Server-chosen destination, e.g. the check-email route. */
-        redirectTo?: string
-      }
-    }
-  | { ok: false; error: string }
+export type AuthResult = ActionResult<{
+  message?: string
+  /** Server-chosen destination, e.g. the check-email route. */
+  redirectTo?: string
+}>
 
-export type JoinResult =
-  | { ok: true; data: { householdName: string } }
-  | { ok: false; error: string }
+export type JoinResult = ActionResult<{ householdName: string }>

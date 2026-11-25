@@ -1,6 +1,6 @@
-export type ActionResult<T = null> =
-  | { ok: true; data: T }
-  | { ok: false; error: string }
+export type ActionFailure = { ok: false; error: string }
+
+export type ActionResult<T = null> = { ok: true; data: T } | ActionFailure
 
 export function ok<T>(data: T): ActionResult<T> {
   return { ok: true, data }
@@ -37,6 +37,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   EXPIRED_DATE: "Expiration date can’t be in the past.",
   INVALID_TREATMENT_END: "Treatment end date can’t be in the past.",
 }
+
+/** Failure copy for a missing session; see `requireSession()` in `src/lib/auth.ts`. */
+export const AUTH_REQUIRED = ERROR_MESSAGES.AUTH_REQUIRED
 
 /** Maps a Postgres error message/code from an RPC to friendly copy. */
 export function mapDbError(error: { message?: string; code?: string } | null): string {

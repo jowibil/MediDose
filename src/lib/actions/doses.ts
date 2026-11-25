@@ -1,17 +1,10 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
-
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { fail, mapDbError, ok, type ActionResult } from "@/lib/action-result"
+import { revalidateViews } from "@/lib/revalidate"
 import { validateSkipInput } from "@/lib/validation"
 import { getTimeZone } from "@/lib/timezone"
-
-function revalidateDoseViews(): void {
-  revalidatePath("/dashboard")
-  revalidatePath("/medicines")
-  revalidatePath("/history")
-}
 
 async function safeTimeZone(timeZone?: string): Promise<string> {
   if (timeZone && timeZone.trim()) return timeZone
@@ -36,7 +29,7 @@ export async function logTakenAction(input: {
   })
 
   if (error) return fail(mapDbError(error))
-  revalidateDoseViews()
+  revalidateViews()
   return ok(null)
 }
 
@@ -63,7 +56,7 @@ export async function logSkippedAction(input: {
   })
 
   if (error) return fail(mapDbError(error))
-  revalidateDoseViews()
+  revalidateViews()
   return ok(null)
 }
 
@@ -92,6 +85,6 @@ export async function updateDoseStatusAction(input: {
   })
 
   if (error) return fail(mapDbError(error))
-  revalidateDoseViews()
+  revalidateViews()
   return ok(null)
 }

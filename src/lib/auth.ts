@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 
 import type { HouseholdGroup, SessionContext } from "@/types/medicine"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { AUTH_REQUIRED } from "@/lib/action-result"
 
 interface MembershipRow {
   household_id: string
@@ -130,4 +131,20 @@ export function canAccessPatient(
   return context.households.some((group) =>
     group.patients.some((patient) => patient.id === patientId),
   )
+}
+
+export type RequiredSession =
+  | { context: SessionContext; error: null }
+  | { context: null; error: string }
+
+/**
+ * Session context for a server action, or the standard signed-out failure.
+ * The copy lives in `action-result.ts` so every action answers a missing
+ * session the same way.
+ */
+export async function requireSession(): Promise<RequiredSession> {
+  const context = await getSessionContext()
+  return context
+    ? { context, error: null }
+    : { context: null, error: AUTH_REQUIRED }
 }

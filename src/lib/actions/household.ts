@@ -4,7 +4,7 @@ import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
 
 import { createSupabaseServerClient } from "@/lib/supabase/server"
-import { getSessionContext, ownerHouseholdId, ACTIVE_PATIENT_COOKIE } from "@/lib/auth"
+import { requireSession, ownerHouseholdId, ACTIVE_PATIENT_COOKIE } from "@/lib/auth"
 import { fail, mapDbError, ok, type ActionResult } from "@/lib/action-result"
 import type { JoinResult } from "@/lib/form-results"
 import {
@@ -17,8 +17,8 @@ export async function renameHouseholdAction(
   householdId: string,
   name: string,
 ): Promise<ActionResult> {
-  const context = await getSessionContext()
-  if (!context) return fail("Please sign in again.")
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
   if (ownerHouseholdId(context) !== householdId) {
     return fail("Only the household owner can rename the household.")
   }
@@ -40,8 +40,8 @@ export async function renameHouseholdAction(
 export async function regenerateInviteCodeAction(
   householdId: string,
 ): Promise<ActionResult<{ code: string }>> {
-  const context = await getSessionContext()
-  if (!context) return fail("Please sign in again.")
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
   if (ownerHouseholdId(context) !== householdId) {
     return fail("Only the household owner can regenerate the invite code.")
   }
@@ -60,8 +60,8 @@ export async function removeCaregiverAction(
   householdId: string,
   userId: string,
 ): Promise<ActionResult> {
-  const context = await getSessionContext()
-  if (!context) return fail("Please sign in again.")
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
   if (ownerHouseholdId(context) !== householdId) {
     return fail("Only the household owner can remove caregivers.")
   }
@@ -81,8 +81,8 @@ export async function removeCaregiverAction(
 export async function updateProfileAction(
   displayName: string,
 ): Promise<ActionResult> {
-  const context = await getSessionContext()
-  if (!context) return fail("Please sign in again.")
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
 
   const nameError = validateDisplayName(displayName)
   if (nameError) return fail(nameError)
@@ -104,8 +104,8 @@ export async function updateProfileAction(
  * cannot be enumerated; the RPC separately throttles five failures per hour.
  */
 export async function joinHouseholdAction(code: string): Promise<JoinResult> {
-  const context = await getSessionContext()
-  if (!context) return { ok: false, error: "Please sign in again." }
+  const { context, error: authError } = await requireSession()
+  if (!context) return { ok: false, error: authError }
 
   const formatError = validateInviteCode(code)
   if (formatError) return { ok: false, error: formatError }

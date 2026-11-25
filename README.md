@@ -58,8 +58,9 @@ Environment variables:
 
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — browser-safe.
 - `NEXT_PUBLIC_SITE_URL` — the public origin used in auth email links. Set it
-  in Vercel for **Production and Preview**; unset it locally to fall back to
-  the request headers and `http://localhost:3000`.
+  in Vercel for **Production only**; leave it unset in Preview so each preview
+  deployment falls back to its own `VERCEL_URL`. Unset it locally to fall back
+  to the request headers and `http://localhost:3000`.
 - `SUPABASE_SERVICE_ROLE_KEY` — **server/tests only**; never imported into
   `src/`. If your project uses Supabase’s newer publishable/secret key naming,
   map them to these variables.
@@ -93,7 +94,8 @@ npm run db:types
 ### Hosted project
 
 1. Enable email confirmation, set the Site URL to the deployed origin, and set
-   `NEXT_PUBLIC_SITE_URL` to the same value for Production and Preview.
+   `NEXT_PUBLIC_SITE_URL` to the same value for Production only — leave it
+   unset in Preview so each deployment uses its own `VERCEL_URL`.
 2. Add the redirect allow-list entries for your origin: `/auth/confirm`,
    `/auth/callback`, and `/reset-password` (plus localhost during development
    and a wildcard for Vercel preview deployments).

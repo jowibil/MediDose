@@ -1,10 +1,9 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
-
 import { createSupabaseServerClient } from "@/lib/supabase/server"
-import { getSessionContext, ownerHouseholdId } from "@/lib/auth"
+import { ownerHouseholdId, requireSession } from "@/lib/auth"
 import { fail, mapDbError, ok, type ActionResult } from "@/lib/action-result"
+import { revalidateViews } from "@/lib/revalidate"
 import {
   hasErrors,
   validateMedicineForm,
@@ -15,13 +14,6 @@ import type { SaveMedicineResult } from "@/lib/form-results"
 import { getTodayInTimeZone } from "@/lib/dates"
 import { timeSlotsForFrequency } from "@/lib/schedule"
 import { getTimeZone } from "@/lib/timezone"
-
-function revalidateMedicineViews(): void {
-  revalidatePath("/dashboard")
-  revalidatePath("/medicines")
-  revalidatePath("/history")
-  revalidatePath("/settings")
-}
 
 function formPayload(values: MedicineFormValues, patientId: string) {
   const frequency = Number(values.frequencyPerDay)
@@ -52,8 +44,8 @@ export async function saveMedicineAction(
   values: MedicineFormValues,
   medicineId?: string,
 ): Promise<SaveMedicineResult> {
-  const context = await getSessionContext()
-  if (!context) return { ok: false, error: "Please sign in again." }
+  const { context, error: authError } = await requireSession()
+  if (!context) return { ok: false, error: authError }
 
   const householdId = ownerHouseholdId(context)
   if (!householdId) {
@@ -123,7 +115,7 @@ export async function saveMedicineAction(
       .eq("id", medicineId)
 
     if (error) return { ok: false, error: mapDbError(error) }
-    revalidateMedicineViews()
+    revalidateViews("medicine")
     return { ok: true, data: { id: medicineId } }
   }
 
@@ -134,15 +126,15 @@ export async function saveMedicineAction(
     .single()
 
   if (error) return { ok: false, error: mapDbError(error) }
-  revalidateMedicineViews()
+  revalidateViews("medicine")
   return { ok: true, data: { id: data.id as string } }
 }
 
 export async function archiveMedicineAction(
   medicineId: string,
 ): Promise<ActionResult> {
-  const context = await getSessionContext()
-  if (!context) return fail("Please sign in again.")
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
   if (!ownerHouseholdId(context)) {
     return fail("Only the household owner can archive medicines.")
   }
@@ -154,15 +146,15 @@ export async function archiveMedicineAction(
     .eq("id", medicineId)
 
   if (error) return fail(mapDbError(error))
-  revalidateMedicineViews()
+  revalidateViews("medicine")
   return ok(null)
 }
 
 export async function restoreMedicineAction(
   medicineId: string,
 ): Promise<ActionResult> {
-  const context = await getSessionContext()
-  if (!context) return fail("Please sign in again.")
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
   if (!ownerHouseholdId(context)) {
     return fail("Only the household owner can restore medicines.")
   }
@@ -174,7 +166,7 @@ export async function restoreMedicineAction(
     .eq("id", medicineId)
 
   if (error) return fail(mapDbError(error))
-  revalidateMedicineViews()
+  revalidateViews("medicine")
   return ok(null)
 }
 
@@ -186,7 +178,7 @@ export async function purgeMedicineAction(
     p_medicine_id: medicineId,
   })
   if (error) return fail(mapDbError(error))
-  revalidateMedicineViews()
+  revalidateViews("medicine")
   return ok(null)
 }
 
@@ -204,7 +196,7 @@ export async function restockAction(
   })
 
   if (error) return fail(mapDbError(error))
-  revalidateMedicineViews()
+  revalidateViews("medicine")
   return ok({ stock: Number(data) })
 }
 
@@ -213,8 +205,8 @@ export async function adjustStockAction(
   medicineId: string,
   delta: number,
 ): Promise<ActionResult> {
-  const context = await getSessionContext()
-  if (!context) return fail("Please sign in again.")
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
   if (!ownerHouseholdId(context)) {
     return fail("Only the household owner can edit stock directly.")
   }
@@ -240,6 +232,6 @@ export async function adjustStockAction(
     .eq("id", medicineId)
 
   if (error) return fail(mapDbError(error))
-  revalidateMedicineViews()
+  revalidateViews("medicine")
   return ok(null)
 }

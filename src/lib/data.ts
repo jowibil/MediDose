@@ -3,30 +3,29 @@ import { toMedicine, toPatient } from "@/lib/mappers"
 import type { Medicine, Patient } from "@/types/medicine"
 import type { DoseLogRow } from "@/lib/occurrences"
 
-export async function getMedicines(patientId: string): Promise<Medicine[]> {
+/**
+ * Medicines for one patient, ordered by name. `includeArchived` keeps past
+ * dose history readable. Household scoping is intentionally left to RLS: the
+ * policies already restrict rows to households the caller belongs to.
+ */
+export async function getMedicines(
+  patientId: string,
+  includeArchived = false,
+): Promise<Medicine[]> {
   const supabase = await createSupabaseServerClient()
-  const { data } = await supabase
-    .from("medicines")
-    .select("*")
-    .eq("patient_id", patientId)
-    .is("archived_at", null)
+  const base = supabase.from("medicines").select("*").eq("patient_id", patientId)
+
+  const { data } = await (includeArchived ? base : base.is("archived_at", null))
     .order("name", { ascending: true })
 
   return (data ?? []).map((row) => toMedicine(row))
 }
 
 /** Active plus archived medicines, used to keep past dose history readable. */
-export async function getMedicinesIncludingArchived(
+export function getMedicinesIncludingArchived(
   patientId: string,
 ): Promise<Medicine[]> {
-  const supabase = await createSupabaseServerClient()
-  const { data } = await supabase
-    .from("medicines")
-    .select("*")
-    .eq("patient_id", patientId)
-    .order("name", { ascending: true })
-
-  return (data ?? []).map((row) => toMedicine(row))
+  return getMedicines(patientId, true)
 }
 
 export async function getMedicineById(id: string): Promise<Medicine | null> {

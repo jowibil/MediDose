@@ -1,31 +1,23 @@
 "use server"
 
 import { cookies } from "next/headers"
-import { revalidatePath } from "next/cache"
 
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import {
   canAccessPatient,
-  getSessionContext,
   ownerHouseholdId,
+  requireSession,
   ACTIVE_PATIENT_COOKIE,
 } from "@/lib/auth"
+import { revalidateViews } from "@/lib/revalidate"
 import { fail, mapDbError, ok, type ActionResult } from "@/lib/action-result"
 import { validatePatientName } from "@/lib/validation"
-
-function revalidatePatientViews(): void {
-  revalidatePath("/dashboard")
-  revalidatePath("/medicines")
-  revalidatePath("/history")
-  revalidatePath("/settings")
-  revalidatePath("/join")
-}
 
 export async function createPatientAction(
   name: string,
 ): Promise<ActionResult<{ id: string }>> {
-  const context = await getSessionContext()
-  if (!context) return fail("Please sign in again.")
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
 
   const householdId = ownerHouseholdId(context)
   if (!householdId) return fail("Only the household owner can add patients.")
@@ -41,7 +33,7 @@ export async function createPatientAction(
     .single()
 
   if (error) return fail(mapDbError(error))
-  revalidatePatientViews()
+  revalidateViews("patient")
   return ok({ id: data.id as string })
 }
 
@@ -49,8 +41,8 @@ export async function renamePatientAction(
   patientId: string,
   name: string,
 ): Promise<ActionResult> {
-  const context = await getSessionContext()
-  if (!context) return fail("Please sign in again.")
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
   const householdId = ownerHouseholdId(context)
   if (!householdId) return fail("Only the household owner can rename patients.")
 
@@ -65,15 +57,15 @@ export async function renamePatientAction(
     .eq("household_id", householdId)
 
   if (error) return fail(mapDbError(error))
-  revalidatePatientViews()
+  revalidateViews("patient")
   return ok(null)
 }
 
 export async function archivePatientAction(
   patientId: string,
 ): Promise<ActionResult> {
-  const context = await getSessionContext()
-  if (!context) return fail("Please sign in again.")
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
   const householdId = ownerHouseholdId(context)
   if (!householdId) return fail("Only the household owner can archive patients.")
 
@@ -85,15 +77,15 @@ export async function archivePatientAction(
     .eq("household_id", householdId)
 
   if (error) return fail(mapDbError(error))
-  revalidatePatientViews()
+  revalidateViews("patient")
   return ok(null)
 }
 
 export async function restorePatientAction(
   patientId: string,
 ): Promise<ActionResult> {
-  const context = await getSessionContext()
-  if (!context) return fail("Please sign in again.")
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
   const householdId = ownerHouseholdId(context)
   if (!householdId) return fail("Only the household owner can restore patients.")
 
@@ -105,7 +97,7 @@ export async function restorePatientAction(
     .eq("household_id", householdId)
 
   if (error) return fail(mapDbError(error))
-  revalidatePatientViews()
+  revalidateViews("patient")
   return ok(null)
 }
 
@@ -117,7 +109,7 @@ export async function purgePatientAction(
     p_patient_id: patientId,
   })
   if (error) return fail(mapDbError(error))
-  revalidatePatientViews()
+  revalidateViews("patient")
   return ok(null)
 }
 
@@ -125,8 +117,8 @@ export async function purgePatientAction(
 export async function setActivePatientAction(
   patientId: string,
 ): Promise<ActionResult> {
-  const context = await getSessionContext()
-  if (!context) return fail("Please sign in again.")
+  const { context, error: authError } = await requireSession()
+  if (!context) return fail(authError)
   if (!canAccessPatient(context, patientId)) {
     return fail("You don’t have access to that patient.")
   }
@@ -140,6 +132,6 @@ export async function setActivePatientAction(
     maxAge: 60 * 60 * 24 * 365,
   })
 
-  revalidatePatientViews()
+  revalidateViews("patient")
   return ok(null)
 }
