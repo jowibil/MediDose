@@ -13,14 +13,15 @@ import {
   isSameOriginRequest,
   normalizeQuestion,
   screenAnswer,
+  screenHistory,
   screenQuestion,
 } from "@/lib/ai/guardrails"
 import {
-  ASSISTANT_SYSTEM_PROMPT,
+  buildAssistantSystemPrompt,
   buildAssistantUserPrompt,
 } from "@/lib/ai/prompts"
 import {
-  AI_NOT_CONFIGURED,
+  AI_UNAVAILABLE,
   AiError,
   completeText,
   isAiConfigured,
@@ -49,6 +50,11 @@ function fail(error: string, status: number) {
  *      slow answer does not block the next question and two simultaneous
  *      requests still resolve to one;
  *   7. answer screening: no dose-change advice, bounded length
+ *
+ * The record is scoped by the reader's role (owner: household, caregiver:
+ * household with their narrower abilities, patient: own record only), and the
+ * last few turns are carried so the panel reads as a conversation. Provider and
+ * configuration detail never leaves the server log.
  *
  * Not in PUBLIC_PREFIXES in the middleware. No CSRF token is needed beyond the
  * cookie's SameSite policy plus (1): a cross-site POST carries neither.
@@ -84,6 +90,8 @@ export async function POST(request: Request) {
   const question = normalizeQuestion(
     typeof bodyQuestion === "string" ? bodyQuestion : "",
   )
+  // Earlier turns are clipped and role-checked; they are conversation, not input.
+  const history = screenHistory((body as { history?: unknown } | null)?.history)
 
   const validationError = validateAssistantQuestion(question)
   if (validationError) return fail(validationError, 400)
@@ -94,7 +102,11 @@ export async function POST(request: Request) {
   const context = await getSessionContext()
   if (!context) return fail("Please sign in again.", 401)
 
-  if (!isAiConfigured()) return fail(AI_NOT_CONFIGURED, 503)
+  if (!isAiConfigured()) {
+    // The variable name belongs in the log, not in the panel.
+    console.error("assistant: AI_API_KEY is not set")
+    return fail(AI_UNAVAILABLE, 503)
+  }
 
   // The active patient is the whole scope: RLS narrowed the rows, and the
   // builder only ever sees this one record.
@@ -128,7 +140,25 @@ export async function POST(request: Request) {
   )
   const language = await getLanguage()
 
+  // The reader's role decides how much household the record may describe. A
+  // patient account gets no roster at all; staff get the names in this
+  // household so "who else is here?" can be answered without ids.
+  // The role that matters is the one in this patient's household, not the
+  // account's strongest role elsewhere.
+  const viewerRole = active.role
+  const householdPatients =
+    viewerRole === "patient"
+      ? []
+      : (context.households
+          .find((group) => group.householdId === active.householdId)
+          ?.patients.map((patient) => patient.name) ?? [])
+
   const record = buildMedicineContext({
+    viewer: {
+      role: viewerRole,
+      householdName: active.householdName,
+      patients: householdPatients,
+    },
     patient: { name: active.name },
     medicines,
     logs,
@@ -137,12 +167,13 @@ export async function POST(request: Request) {
 
   try {
     const answer = await completeText({
-      system: ASSISTANT_SYSTEM_PROMPT,
+      system: buildAssistantSystemPrompt(viewerRole),
       user: buildAssistantUserPrompt({
         question,
         record: serializeContext(record),
         language,
       }),
+      history,
     })
 
     return NextResponse.json(
@@ -157,7 +188,11 @@ export async function POST(request: Request) {
     } catch {
       // Nothing to do: the provider error below is the useful message.
     }
-    if (error instanceof AiError) return fail(error.message, 502)
-    return fail("The assistant could not answer. Please try again.", 502)
+    // Provider detail stays in the log; the panel gets one plain sentence.
+    console.error("assistant: provider call failed", {
+      kind: error instanceof AiError ? error.kind : "unexpected",
+      message: error instanceof AiError ? error.message : undefined,
+    })
+    return fail(AI_UNAVAILABLE, 502)
   }
 }

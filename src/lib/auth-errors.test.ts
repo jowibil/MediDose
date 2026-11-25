@@ -73,4 +73,12 @@ describe("mapAuthError", () => {
     const providerText = "For security purposes, you can only request this after 60 seconds."
     expect(mapAuthError({ message: providerText })).not.toContain("security purposes")
   })
+
+  it("hides an unclassified provider message", () => {
+    expect(
+      mapAuthError({
+        message: 'Database error saving new user: relation "profiles" does not exist',
+      }),
+    ).toBe(AUTH_ERROR_MESSAGES.unknown)
+  })
 })

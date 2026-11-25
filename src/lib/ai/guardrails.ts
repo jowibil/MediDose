@@ -7,8 +7,19 @@
  * the rules can be tested without a network or a database.
  */
 
-/** Hard cap on the JSON body, checked before parsing. */
-export const MAX_REQUEST_BYTES = 4_096
+import type { ChatTurn } from "@/lib/ai/client"
+
+/**
+ * Hard cap on the JSON body, checked before parsing. A conversation carries a
+ * short history, so the cap is larger than one question but still tiny.
+ */
+export const MAX_REQUEST_BYTES = 16_384
+
+/** Earlier turns accepted from the client. Only the tail is kept. */
+export const MAX_HISTORY_TURNS = 8
+
+/** Each retained turn is cut to this length before it reaches the model. */
+export const MAX_HISTORY_CHARS = 300
 
 /** The longest answer shown to a person. Longer answers are cut at a sentence. */
 export const MAX_ANSWER_CHARS = 1_400
@@ -79,6 +90,29 @@ export function normalizeQuestion(raw: string): string {
     cleaned += code < 0x20 || code === 0x7f ? " " : character
   }
   return cleaned.replace(/\s+/g, " ").trim()
+}
+
+/**
+ * Earlier turns are conversation, not credentials: each is normalised, clipped,
+ * and limited to the recognised roles. Anything else is dropped, and the caller
+ * only ever sends the tail, so a long or malformed thread cannot grow the
+ * request or outweigh the current question.
+ */
+export function screenHistory(raw: unknown): ChatTurn[] {
+  if (!Array.isArray(raw)) return []
+
+  const turns: ChatTurn[] = []
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue
+    const { role, content } = item as { role?: unknown; content?: unknown }
+    if (role !== "user" && role !== "assistant") continue
+    if (typeof content !== "string") continue
+    const normalized = normalizeQuestion(content).slice(0, MAX_HISTORY_CHARS)
+    if (!normalized) continue
+    turns.push({ role, content: normalized })
+  }
+
+  return turns.slice(-MAX_HISTORY_TURNS)
 }
 
 export type QuestionScreen = { allowed: true } | { allowed: false; reason: string }

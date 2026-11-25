@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:rls": "tsx scripts/run-rls-tests.ts",
+    "check:role-chat": "tsx scripts/check-role-chat.ts",
     "seed": "tsx scripts/seed.ts",
     "db:start": "supabase start",
     "db:stop": "supabase stop",

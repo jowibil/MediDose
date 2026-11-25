@@ -29,6 +29,8 @@ export const AUTH_ERROR_MESSAGES = {
     "Too many attempts from this network. Wait a few minutes and try again.",
   /** Unclassified throttling, from a response without a code. */
   rateLimited: "Too many attempts. Wait a few minutes and try again.",
+  /** Anything else: the provider's own text is never shown. */
+  unknown: "Something went wrong signing you in. Please try again.",
 } as const
 
 export interface AuthErrorLike {
@@ -93,5 +95,7 @@ export function mapAuthError(error: AuthErrorLike): string {
     return AUTH_ERROR_MESSAGES.rateLimited
   }
 
-  return message
+  // Unknown Auth failures can name the schema, the SMTP server, or an address.
+  // None of that helps the person signing in.
+  return AUTH_ERROR_MESSAGES.unknown
 }

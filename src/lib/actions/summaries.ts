@@ -14,7 +14,12 @@ import {
 import { buildWeekSlots, buildWeekStats, weekRange } from "@/lib/summary"
 import { fail, mapDbError, ok, type ActionResult } from "@/lib/action-result"
 import { daysUntil, getTodayInTimeZone } from "@/lib/dates"
-import { completeJson, completionText, AiError } from "@/lib/ai/client"
+import {
+  AI_UNAVAILABLE,
+  AiError,
+  completeJson,
+  completionText,
+} from "@/lib/ai/client"
 import { buildSummaryUserPrompt, SUMMARY_SYSTEM_PROMPT } from "@/lib/ai/prompts"
 
 /**
@@ -55,12 +60,12 @@ export async function ensureWeekFrozen(
   })
 
   if (error) {
-    // Ids only: no patient names or medicine names in logs.
+    // The error code only: a Postgres message can quote the row values it
+    // rejected, and patient names must not reach the log either.
     console.error("summary: freeze_week failed", {
       patientId,
       weekStart,
       code: error.code,
-      message: error.message,
     })
     return false
   }
@@ -156,13 +161,15 @@ export async function generateWeeklySummaryAction(input: {
     summaryFil = completionText(completion.data, "fil")
     model = completion.model
   } catch (error) {
-    if (error instanceof AiError) return fail(error.message)
-    return fail("The summary could not be written. Please try again.")
+    // Provider detail stays in the log; the card gets one plain sentence.
+    console.error("summary: provider call failed", {
+      kind: error instanceof AiError ? error.kind : "unexpected",
+      message: error instanceof AiError ? error.message : undefined,
+    })
+    return fail(AI_UNAVAILABLE)
   }
 
-  if (!summaryEn) {
-    return fail("The AI service returned an empty summary. Please try again.")
-  }
+  if (!summaryEn) return fail(AI_UNAVAILABLE)
 
   const { data: id, error } = await supabase.rpc("save_weekly_summary", {
     p_patient_id: input.patientId,

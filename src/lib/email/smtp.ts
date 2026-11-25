@@ -48,6 +48,19 @@ export function readSmtpConfig(
   }
 }
 
+/**
+ * Address-free detail for a failed send. Provider errors echo the envelope —
+ * recipients included — so only the error name and transport code are kept.
+ */
+export function describeSendFailure(error: unknown): {
+  name: string
+  code: string | null
+} {
+  if (!(error instanceof Error)) return { name: "UnknownError", code: null }
+  const code = (error as { code?: unknown }).code
+  return { name: error.name, code: typeof code === "string" ? code : null }
+}
+
 export async function sendRenderedEmail(
   email: RenderedEmail,
   config: SmtpConfig,

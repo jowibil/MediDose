@@ -26,6 +26,7 @@ coverage
 playwright-report
 test-results
 tests/e2e/.fixtures.json
+.role-chat-check.json
 
 # Supabase CLI
 supabase/.temp

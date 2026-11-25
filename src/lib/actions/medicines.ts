@@ -229,7 +229,6 @@ export async function undoDisposeMedicineAction(
     console.error("dispose: restore_future_expected failed", {
       medicineId,
       code: restoreError.code,
-      message: restoreError.message,
     })
   }
 

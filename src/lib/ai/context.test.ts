@@ -2,9 +2,19 @@ import { describe, expect, it } from "vitest"
 
 import type { Medicine } from "@/types/medicine"
 import type { DoseLogRow } from "@/lib/occurrences"
-import { buildMedicineContext, serializeContext } from "@/lib/ai/context"
+import {
+  buildMedicineContext,
+  serializeContext,
+  type AssistantViewer,
+} from "@/lib/ai/context"
 
 const TODAY = "2026-11-25"
+
+const staffViewer: AssistantViewer = {
+  role: "owner",
+  householdName: "Rivera household",
+  patients: ["Alex Rivera"],
+}
 
 function medicine(overrides: Partial<Medicine> = {}): Medicine {
   return {
@@ -58,6 +68,7 @@ describe("buildMedicineContext", () => {
     })
 
     const context = buildMedicineContext({
+      viewer: staffViewer,
       patient: { name: "Alex Rivera" },
       medicines: [alexMedicine],
       logs: [log()],
@@ -77,6 +88,7 @@ describe("buildMedicineContext", () => {
 
   it("carries no identifiers, emails, or internal keys", () => {
     const context = buildMedicineContext({
+      viewer: staffViewer,
       patient: { name: "Alex" },
       medicines: [medicine()],
       logs: [log()],
@@ -93,6 +105,7 @@ describe("buildMedicineContext", () => {
 
   it("lists the active cabinet only, with stock and expiry distance", () => {
     const context = buildMedicineContext({
+      viewer: staffViewer,
       patient: { name: "Alex" },
       medicines: [
         medicine(),
@@ -129,6 +142,7 @@ describe("buildMedicineContext", () => {
     )
 
     const context = buildMedicineContext({
+      viewer: staffViewer,
       patient: { name: "Alex" },
       medicines: [medicine()],
       logs,
@@ -140,8 +154,54 @@ describe("buildMedicineContext", () => {
     expect(context.totals).toEqual({ taken: 19, skipped: 1 })
   })
 
+  it("tells the model what the reader's role may do", () => {
+    const owner = buildMedicineContext({
+      viewer: staffViewer,
+      patient: { name: "Alex" },
+      medicines: [medicine()],
+      logs: [],
+      todayIso: TODAY,
+    })
+    expect(owner.viewer).toMatchObject({
+      role: "owner",
+      household: "Rivera household",
+      peopleInHousehold: ["Alex Rivera"],
+    })
+    expect(owner.viewer.can.join(" ")).toContain("dispose medicines")
+
+    const caregiver = buildMedicineContext({
+      viewer: { ...staffViewer, role: "caregiver" },
+      patient: { name: "Alex" },
+      medicines: [medicine()],
+      logs: [],
+      todayIso: TODAY,
+    })
+    expect(caregiver.viewer.role).toBe("caregiver")
+    expect(caregiver.viewer.can.join(" ")).toContain("cannot add or edit")
+  })
+
+  it("gives a patient account no household roster", () => {
+    const context = buildMedicineContext({
+      viewer: {
+        role: "patient",
+        householdName: "Rivera household",
+        patients: ["Alex", "Sam"],
+      },
+      patient: { name: "Alex" },
+      medicines: [medicine()],
+      logs: [],
+      todayIso: TODAY,
+    })
+
+    expect(context.viewer.role).toBe("patient")
+    expect(context.viewer.household).toBeNull()
+    expect(context.viewer.peopleInHousehold).toEqual([])
+    expect(serializeContext(context)).not.toContain("Sam")
+  })
+
   it("names a dose whose medicine is no longer in the cabinet", () => {
     const context = buildMedicineContext({
+      viewer: staffViewer,
       patient: { name: "Alex" },
       medicines: [],
       logs: [log({ medicine_id: "gone" })],

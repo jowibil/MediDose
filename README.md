@@ -33,9 +33,12 @@ TypeScript)** with **Supabase** (Postgres, Auth, Row Level Security).
   later schedule edits cannot rewrite it. AI writes an English + Filipino
   summary from those frozen counters; a person marks it reviewed, and
   regenerating overwrites the row and clears the flag.
-- **Bilingual assistant** — “Ask MediDose” answers only from the active
-  patient’s record, in English or Filipino (a `md_lang` cookie plus the prompt),
-  behind deterministic guardrails and a daily quota.
+- **Bilingual assistant** — “Ask MediDose” is a chat panel that answers only
+  from the active patient’s record, in English or Filipino (a `md_lang` cookie
+  plus the prompt), behind deterministic guardrails and a daily quota. The
+  record is scoped by the reader’s role: an owner sees the household, a
+  caregiver sees its patients with their narrower abilities, and a patient
+  account sees only its own record plus app guidance.
 - **Pharmacy list** — one household-wide list split into Restock / Expiring soon /
   Expired, with a patient name on every row, plus copy-to-clipboard and print
   styles that drop the shell.
@@ -165,6 +168,7 @@ Local `npm run db:start` keeps using Inbucket unless you enable the hook in
 | `npm test` | Vitest unit suites |
 | `npm run test:rls` | SQL RLS assertions through `psql` |
 | `npm run test:e2e` | Playwright flows (local Supabase) |
+| `npm run check:role-chat` | three-role check of `/api/ai/chat` against a disposable household |
 | `npm run db:start` / `db:stop` / `db:reset` | Local Supabase |
 | `npm run db:push` | Push migrations to the linked project |
 | `npm run seed` | Local/test fixtures |
@@ -232,6 +236,14 @@ The pre-rework app stored data in `localStorage`. No legacy data existed, so
 - `tests/e2e/*.spec.ts` — skip-with-reason, caregiver join/switch/restock, and
   caregiver edit denial (including direct REST calls). The three-role, summary,
   pharmacy and disposal flows are not in the E2E suite yet.
+- `scripts/check-role-chat.ts` — end-to-end for `/api/ai/chat`: creates a
+  disposable owner/caregiver/two-patient household, calls the route with a real
+  session per role, and asserts the owner and caregiver records carry the
+  household roster, the patient record carries neither the roster nor a
+  sibling's medicine, a follow-up turn carries its history, and a signed-out
+  request is refused. `--stub` points the app at a local echo provider, so the
+  role assertions are exact and spend no AI quota. It writes to the hosted
+  project only with `ALLOW_REMOTE_ROLE_CHECK=1` and deletes its fixtures.
 
 The unit suite pins `TZ=America/New_York` for deterministic local-day tests.
 RLS and E2E suites require local Supabase (Docker).
@@ -242,7 +254,7 @@ RLS and E2E suites require local Supabase (Docker).
 src/app/(auth)/        login, signup, forgot/reset password
 src/app/(app)/         dashboard, medicines, history, summaries, settings, join
 src/app/auth/          confirm + callback route handlers
-src/app/api/ai/chat/   assistant route (guarded, patient-scoped)
+src/app/api/ai/chat/   assistant route (guarded, role-scoped conversation)
 src/components/        UI primitives, app shell, doses, medicines, summaries,
                        assistant, settings
 src/lib/               supply, schedule, dates, validation, data, actions

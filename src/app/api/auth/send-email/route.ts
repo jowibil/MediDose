@@ -14,7 +14,11 @@
 import { NextResponse } from "next/server"
 
 import { verifyEmailHookSignature } from "@/lib/email/email-webhook"
-import { readSmtpConfig, sendRenderedEmail } from "@/lib/email/smtp"
+import {
+  describeSendFailure,
+  readSmtpConfig,
+  sendRenderedEmail,
+} from "@/lib/email/smtp"
 import { isAuthEmailPayload, renderAuthEmails } from "@/lib/email/templates"
 
 export const runtime = "nodejs"
@@ -76,9 +80,10 @@ export async function POST(request: Request) {
       await sendRenderedEmail(email, smtp)
     }
   } catch (error) {
+    // SMTP errors quote the envelope, recipient included. Name and code only.
     console.error(
       `[auth-email] send failed for action "${action}":`,
-      error instanceof Error ? error.message : error,
+      describeSendFailure(error),
     )
     return refuse(500, "send_failed")
   }

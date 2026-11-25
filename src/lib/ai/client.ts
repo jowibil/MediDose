@@ -14,8 +14,25 @@ export class AiError extends Error {
   }
 }
 
-export const AI_NOT_CONFIGURED =
-  "AI is not configured on this deployment. Add AI_API_KEY and AI_API_BASE, then redeploy."
+/**
+ * Operator diagnostic. It names the missing variable for the server log and is
+ * never returned to a person: the route and the summary action answer with
+ * AI_UNAVAILABLE instead.
+ */
+export const AI_NOT_CONFIGURED = "AI is not configured: AI_API_KEY is missing."
+
+/**
+ * What a person sees when the provider is missing, slow, or failing. Nothing
+ * about environment variables, provider status codes, or the request itself.
+ */
+export const AI_UNAVAILABLE =
+  "The AI helper isn’t available right now. Please try again in a moment."
+
+/** One earlier turn in the assistant conversation. */
+export interface ChatTurn {
+  role: "user" | "assistant"
+  content: string
+}
 
 export function isAiConfigured(): boolean {
   return Boolean(process.env.AI_API_KEY?.trim())
@@ -28,11 +45,13 @@ function modelName(): string {
 async function chat({
   system,
   user,
+  history = [],
   json,
   timeoutMs,
 }: {
   system: string
   user: string
+  history?: ChatTurn[]
   json: boolean
   timeoutMs: number
 }): Promise<{ content: string; model: string }> {
@@ -58,6 +77,7 @@ async function chat({
         ...(json ? { response_format: { type: "json_object" } } : {}),
         messages: [
           { role: "system", content: system },
+          ...history.map((turn) => ({ role: turn.role, content: turn.content })),
           { role: "user", content: user },
         ],
       }),
@@ -127,13 +147,21 @@ export async function completeJson({
 export async function completeText({
   system,
   user,
+  history,
   timeoutMs = 25_000,
 }: {
   system: string
   user: string
+  history?: ChatTurn[]
   timeoutMs?: number
 }): Promise<string> {
-  const { content } = await chat({ system, user, json: false, timeoutMs })
+  const { content } = await chat({
+    system,
+    user,
+    history,
+    json: false,
+    timeoutMs,
+  })
   return content.trim()
 }
 
