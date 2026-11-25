@@ -25,20 +25,42 @@ TypeScript)** with **Supabase** (Postgres, Auth, Row Level Security).
   owner edit) is recorded in `stock_adjustments`.
 - **Expiration board** — Safe / Expiring soon (≤30 days) / Expired, with
   archive instead of silent deletion.
+- **Three roles** — owner, caregiver, and a **patient account** bound to one
+  patient record through a six-character link code the owner issues. A patient
+  sees only their own doses and history, and can correct nothing; the nav and
+  the server both enforce it.
+- **Weekly summaries** — the first visit to a week freezes its expected doses, so
+  later schedule edits cannot rewrite it. AI writes an English + Filipino
+  summary from those frozen counters; a person marks it reviewed, and
+  regenerating overwrites the row and clears the flag.
+- **Bilingual assistant** — “Ask MediDose” answers only from the active
+  patient’s record, in English or Filipino (a `md_lang` cookie plus the prompt),
+  behind deterministic guardrails and a daily quota.
+- **Pharmacy list** — one household-wide list split into Restock / Expiring soon /
+  Expired, with a patient name on every row, plus copy-to-clipboard and print
+  styles that drop the shell.
+- **Disposal** — one-click discard for an expired medicine, a confirmed
+  “Dispose…” in the cabinet for a damaged or mistaken entry, and an inline undo
+  for 30 seconds that restores the stock and the week’s expected doses.
 
 ## Role model
 
-| Capability | Owner | Caregiver |
-| --- | --- | --- |
-| View patients, medicines, doses, ledger | Own household | Linked households |
-| Create/edit/archive/purge patients & medicines | Yes | No |
-| Log Taken/Skipped and correct Taken ↔ Skipped | Yes | Yes |
-| Restock | Yes | Yes |
-| View/regenerate invite code, rename household, remove caregivers | Yes | No |
-| Join another household | No (fixed role) | Yes, many |
+| Capability | Owner | Caregiver | Patient account |
+| --- | --- | --- | --- |
+| View patients, medicines, doses, ledger | Own household | Linked households | Own record only |
+| Create/edit/archive/purge/dispose patients & medicines | Yes | No | No |
+| Log Taken/Skipped and correct Taken ↔ Skipped | Yes | Yes | No — asks a caregiver |
+| Restock | Yes | Yes | No |
+| Weekly summaries, assistant | Yes | Yes | Assistant only |
+| View/regenerate invite code, rename household, remove caregivers | Yes | No | No |
+| Join another household | No (fixed role) | Yes, many | Bound to one patient |
+| Redeem a patient link code | Issues it | — | Yes, once |
 
 Roles are chosen at signup and cannot change. An owner has exactly one
-household and can never join another. Enforced in the database, not just the UI.
+household and can never join another. A patient account is one patient record in
+one household, linked by the owner’s six-character code (single use, throttled,
+readable only by the owner). `user_metadata.account_type` only routes the UI —
+never authorizes anything. Enforced in the database, not just the UI.
 
 ## Prerequisites
 
@@ -65,6 +87,12 @@ Environment variables:
   `src/`. If your project uses Supabase’s newer publishable/secret key naming,
   map them to these variables.
 - `DATABASE_URL` — local Postgres for `npm run test:rls`.
+- `AI_API_KEY` — server-only key for the OpenAI-compatible endpoint used by the
+  weekly summary and the assistant. With no key both surfaces say so instead of
+  failing the page.
+- `AI_API_BASE` — the endpoint base; defaults to Gemini’s OpenAI-compatible
+  layer (`https://generativelanguage.googleapis.com/v1beta/openai`).
+- `AI_MODEL` — the model name that endpoint accepts (`gemini-3.6-flash` today).
 
 ### Local Supabase
 
@@ -150,12 +178,21 @@ defaults, and restock-by labels. Dose occurrences are identified by wall-clock
 timestamptz for ordering/audit. Crossing timezones therefore does not move a
 dose to another date in history.
 
-## Archive vs. purge
+## Archive vs. dispose vs. purge
 
-Archiving a patient or medicine hides it from active views but keeps dose logs
-and stock movements readable. Owners can restore from Settings, or purge with a
-typed confirmation — purge permanently cascades through medicines, dose logs,
-and stock adjustments.
+- **Archive** hides a patient or medicine from active views but keeps dose logs
+  and stock movements readable. Restorable from Settings.
+- **Dispose** (medicines only) discards the remaining stock and archives the
+  medicine in one step, recording a `disposed` ledger row. It is the action for a
+  damaged supply or a record added by mistake. The inline undo restores the
+  quantity read from the ledger — never from the browser — and puts the frozen
+  future doses back.
+- **Purge** is the typed-confirmation owner action that permanently cascades
+  through medicines, dose logs, and stock adjustments.
+
+A disposal is the only mid-week change that removes expected doses from a frozen
+week (a damaged or mistaken medicine must not depress adherence), which is why
+undo has to restore them.
 
 ## Security
 
@@ -165,8 +202,18 @@ and stock adjustments.
   through `get_invite_code()` for owners.
 - Caregivers have no direct INSERT/UPDATE on medicines or dose logs; restocking
   and dose logging go through validated RPCs.
-- Invite joins return one generic error and are throttled at five failures per
-  hour per user.
+- A patient account reads only its own record (`can_view_patient`);
+  `patients.user_id` and `patients.link_code` sit outside the column grants, so
+  even a household member cannot select them.
+- The assistant route checks same origin, JSON content type and a 4 KB body cap,
+  screens the question (prompt injection, unrelated topics), enforces a 2-second
+  cooldown plus 30 questions a day in `ai_usage`, screens the answer for
+  dose-change advice, and returns `cache-control: no-store`. A failed provider
+  call refunds the question.
+- AI calls send the patient’s first name and medicine names to the provider —
+  never an email address or account id. The assistant panel says so.
+- Invite and patient link codes return one generic error and are throttled per
+  user.
 - The service-role key is used only by `scripts/seed.ts` and Playwright setup.
 
 ## Legacy data
@@ -176,10 +223,15 @@ The pre-rework app stored data in `localStorage`. No legacy data existed, so
 
 ## Tests
 
-- `src/lib/*.test.ts` — supply, schedule, dates, validation.
+- `src/lib/*.test.ts` — supply, schedule, dates, validation, `summary.ts`
+  (week stats), `pharmacy-list.ts` (sections, ordering, one-row rule), and
+  `ai/` (record serialization, guardrails: injection, off-topic, harmless vs
+  unsafe advice, answer length, origin checks).
 - `supabase/tests/rls.test.sql` — 20+ owner/caregiver/unlinked assertions.
+  It predates the patient role, so it does not yet cover the patient account.
 - `tests/e2e/*.spec.ts` — skip-with-reason, caregiver join/switch/restock, and
-  caregiver edit denial (including direct REST calls).
+  caregiver edit denial (including direct REST calls). The three-role, summary,
+  pharmacy and disposal flows are not in the E2E suite yet.
 
 The unit suite pins `TZ=America/New_York` for deterministic local-day tests.
 RLS and E2E suites require local Supabase (Docker).
@@ -188,15 +240,20 @@ RLS and E2E suites require local Supabase (Docker).
 
 ```text
 src/app/(auth)/        login, signup, forgot/reset password
-src/app/(app)/         dashboard, medicines, history, settings, join
+src/app/(app)/         dashboard, medicines, history, summaries, settings, join
 src/app/auth/          confirm + callback route handlers
-src/components/        UI primitives, app shell, doses, medicines, settings
+src/app/api/ai/chat/   assistant route (guarded, patient-scoped)
+src/components/        UI primitives, app shell, doses, medicines, summaries,
+                       assistant, settings
 src/lib/               supply, schedule, dates, validation, data, actions
+  summary.ts           frozen-week stats and slot building (pure)
+  pharmacy-list.ts     restock/expiring/expired list + plain-text export (pure)
+  ai/                  client, prompts, record builder, guardrails
+  language.ts(-server) md_lang cookie
 src/types/             domain types + database schema types
 supabase/migrations/   versioned schema, RLS, RPCs, triggers
-supabase/tests/        SQL RLS proof suite
 tests/e2e/             Playwright flows + fixtures
-docs/migration-audit.md
+docs/                  context, requirements, migration audit, this plan
 ```
 
 ## Medical disclaimer
