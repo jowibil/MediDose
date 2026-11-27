@@ -82,8 +82,12 @@ values (:'household_a', '22222222-2222-2222-2222-222222222222', 'caregiver');
 select set_config('request.jwt.claims', json_build_object('sub', '11111111-1111-1111-1111-111111111111', 'role', 'authenticated')::text, true);
 set local role authenticated;
 
+-- `returning id` is what the Add patient action sends; it also applies
+-- patients_select to the new row, so the policy must answer for a row this
+-- statement is still writing.
 insert into public.patients (household_id, name)
-values (:'household_a', 'Owner Added Patient');
+values (:'household_a', 'Owner Added Patient')
+returning id;
 select public._assert_true(
   (select count(*) from public.patients where name = 'Owner Added Patient') = 1,
   'owner can insert a patient in their household');
