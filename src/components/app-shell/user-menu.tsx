@@ -1,6 +1,7 @@
 "use client"
 
-import { ChevronDown, LogOut, UserRound } from "lucide-react"
+import Link from "next/link"
+import { ChevronDown, KeyRound, LogOut, UserRound } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -60,6 +61,23 @@ export function UserMenu({
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           {ROLE_COPY[role]}
         </p>
+        {/* Only a caregiver may join a second household, and /join is not in
+            their nav, so this menu is their one visible way in. */}
+        {role === "caregiver" ? (
+          <div className="pt-1">
+            <Button
+              asChild
+              variant="outline"
+              className="w-full justify-start"
+              size="sm"
+            >
+              <Link href="/join">
+                <KeyRound aria-hidden="true" className="size-4" />
+                Join another household
+              </Link>
+            </Button>
+          </div>
+        ) : null}
         <form action={signOutAction} className="pt-1">
           <Button
             type="submit"
