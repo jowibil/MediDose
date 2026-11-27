@@ -13,16 +13,32 @@ import {
 import type { SaveMedicineResult } from "@/lib/form-results"
 import { getTodayInTimeZone } from "@/lib/dates"
 import { timeSlotsForFrequency } from "@/lib/schedule"
+import {
+  defaultIntervalHours,
+  strictIntervalSlots,
+  validateIntervalHours,
+} from "@/lib/schedule-interval"
 import { getTimeZone } from "@/lib/timezone"
 
-function formPayload(values: MedicineFormValues, patientId: string) {
+function formPayload(
+  values: MedicineFormValues,
+  patientId: string,
+  intervalHours?: string,
+) {
   const frequency = Number(values.frequencyPerDay)
-  const scheduleTimes = timeSlotsForFrequency(
-    frequency,
-    values.firstDoseTime || "08:00",
-    values.scheduleMode,
-    values.scheduleMode === "custom" ? values.customTimes : [],
-  )
+  const scheduleTimes =
+    values.scheduleMode === "strict_interval"
+      ? strictIntervalSlots(
+          frequency,
+          values.firstDoseTime || "08:00",
+          Number(intervalHours ?? defaultIntervalHours(frequency)),
+        )
+      : timeSlotsForFrequency(
+          frequency,
+          values.firstDoseTime || "08:00",
+          values.scheduleMode,
+          values.scheduleMode === "custom" ? values.customTimes : [],
+        )
 
   return {
     patient_id: patientId,
@@ -43,6 +59,7 @@ function formPayload(values: MedicineFormValues, patientId: string) {
 export async function saveMedicineAction(
   values: MedicineFormValues,
   medicineId?: string,
+  intervalHours?: string,
 ): Promise<SaveMedicineResult> {
   const { context, error: authError } = await requireSession()
   if (!context) return { ok: false, error: authError }
@@ -62,6 +79,20 @@ export async function saveMedicineAction(
       error: "Please fix the highlighted fields.",
       fieldErrors,
     }
+  }
+
+  // A strict schedule's interval is the client's choice, so re-check it here:
+  // too long an interval cannot produce `frequency` distinct daily slots.
+  const strictInterval =
+    values.scheduleMode === "strict_interval"
+      ? (intervalHours ?? defaultIntervalHours(Number(values.frequencyPerDay)))
+      : undefined
+  if (strictInterval !== undefined) {
+    const intervalError = validateIntervalHours(
+      strictInterval,
+      Number(values.frequencyPerDay),
+    )
+    if (intervalError) return { ok: false, error: intervalError }
   }
 
   const supabase = await createSupabaseServerClient()
@@ -93,7 +124,7 @@ export async function saveMedicineAction(
     }
   }
 
-  const payload = formPayload(values, patientId)
+  const payload = formPayload(values, patientId, strictInterval)
 
   if (medicineId) {
     const { data: existing } = await supabase

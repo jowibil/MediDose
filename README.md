@@ -9,7 +9,8 @@ TypeScript)** with **Supabase** (Postgres, Auth, Row Level Security).
 ## Features
 
 - **Smart schedules** — waking-hours distribution (first dose → 10:00 PM),
-  strict `24 / frequency` intervals, and custom times.
+  strict every-N-hours intervals (e.g. 4×/day every 4 hours → 8 AM, 12 NN,
+  4 PM, 8 PM), and custom times.
 - **Skipped-dose reasons** — Pending / Taken / Skipped, with exactly one of
   Forgot, Out of stock, Felt unwell, or Doctor advised, plus an optional
   500-character note. Reasons are filterable in history.

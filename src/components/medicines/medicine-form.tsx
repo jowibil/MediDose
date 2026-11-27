@@ -11,6 +11,15 @@ import type { MedicineFormErrors, MedicineFormValues } from "@/lib/validation"
 import { hasErrors, validateMedicineForm } from "@/lib/validation"
 import { calculateSupply, supplyBadgeVariant } from "@/lib/supply"
 import { formatTime12h, timeSlotsForFrequency } from "@/lib/schedule"
+import {
+  MAX_INTERVAL_HOURS,
+  MIN_INTERVAL_HOURS,
+  defaultIntervalHours,
+  intervalHoursFromSchedule,
+  strictCycleWaitMinutes,
+  strictIntervalDoseSlots,
+  validateIntervalHours,
+} from "@/lib/schedule-interval"
 import { saveMedicineAction } from "@/lib/actions/medicines"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -32,10 +41,13 @@ import {
 
 const NEW_PATIENT = "__new__"
 
+/** Form-only field: the strict schedule's interval, not stored as its own column. */
+type FormState = MedicineFormValues & { intervalHours: string }
+
 function initialValues(
   medicine: Medicine | undefined,
   defaultPatientId: string,
-): MedicineFormValues {
+): FormState {
   if (!medicine) {
     return {
       name: "",
@@ -50,6 +62,7 @@ function initialValues(
       treatmentEndDate: "",
       scheduleMode: "waking_hours",
       customTimes: ["08:00"],
+      intervalHours: defaultIntervalHours(1),
     }
   }
 
@@ -69,6 +82,14 @@ function initialValues(
       medicine.customTimes && medicine.customTimes.length > 0
         ? medicine.customTimes
         : [medicine.firstDoseTime],
+    intervalHours:
+      medicine.scheduleMode === "strict_interval"
+        ? intervalHoursFromSchedule(
+            medicine.scheduleTimes,
+            medicine.firstDoseTime,
+            medicine.frequencyPerDay,
+          )
+        : defaultIntervalHours(medicine.frequencyPerDay),
   }
 }
 
@@ -82,32 +103,54 @@ export function MedicineForm({
   medicine?: Medicine
 }) {
   const router = useRouter()
-  const [values, setValues] = useState<MedicineFormValues>(() =>
+  const [values, setValues] = useState<FormState>(() =>
     initialValues(medicine, defaultPatientId),
   )
   const [errors, setErrors] = useState<MedicineFormErrors>({})
+  const [intervalError, setIntervalError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const frequency = Number(values.frequencyPerDay) || 1
   const previewSupply = calculateSupply(Number(values.stock), frequency)
-  const previewSlots = timeSlotsForFrequency(
-    frequency,
-    values.firstDoseTime || "08:00",
-    values.scheduleMode,
-    values.scheduleMode === "custom" ? values.customTimes : [],
-  )
+  const intervalProblem =
+    values.scheduleMode === "strict_interval"
+      ? validateIntervalHours(values.intervalHours, frequency)
+      : null
+  const previewSlots =
+    values.scheduleMode === "strict_interval"
+      ? intervalProblem
+        ? []
+        : strictIntervalDoseSlots(
+            frequency,
+            values.firstDoseTime || "08:00",
+            Number(values.intervalHours),
+          )
+      : timeSlotsForFrequency(
+          frequency,
+          values.firstDoseTime || "08:00",
+          values.scheduleMode,
+          values.scheduleMode === "custom" ? values.customTimes : [],
+        )
+  const strictCycleWait =
+    values.scheduleMode === "strict_interval" && !intervalProblem
+      ? strictCycleWaitMinutes(frequency, Number(values.intervalHours))
+      : 0
 
-  function setField<K extends keyof MedicineFormValues>(
-    key: K,
-    value: MedicineFormValues[K],
-  ) {
+  function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setValues((previous) => ({ ...previous, [key]: value }))
   }
 
   function handleFrequencyChange(next: string) {
     setField("frequencyPerDay", next)
     const nextFrequency = Number(next)
+    if (values.scheduleMode === "strict_interval" && Number.isInteger(nextFrequency)) {
+      // Keep the owner's interval when it still fits; otherwise fall back to
+      // the 24 / frequency default for the new count.
+      if (validateIntervalHours(values.intervalHours, nextFrequency)) {
+        setField("intervalHours", defaultIntervalHours(nextFrequency))
+      }
+    }
     if (values.scheduleMode === "custom" && Number.isInteger(nextFrequency)) {
       const times = [...values.customTimes]
       while (times.length < nextFrequency) times.push("12:00")
@@ -118,6 +161,12 @@ export function MedicineForm({
 
   function handleModeChange(mode: ScheduleMode) {
     setField("scheduleMode", mode)
+    if (mode === "strict_interval") {
+      const count = Number(values.frequencyPerDay) || 1
+      if (validateIntervalHours(values.intervalHours, count)) {
+        setField("intervalHours", defaultIntervalHours(count))
+      }
+    }
     if (mode === "custom") {
       const count = Number(values.frequencyPerDay) || 1
       setField(
@@ -136,14 +185,23 @@ export function MedicineForm({
     const nextErrors = validateMedicineForm(values, {
       todayIso: new Date().toISOString().slice(0, 10),
     })
+    const nextIntervalError =
+      values.scheduleMode === "strict_interval"
+        ? validateIntervalHours(values.intervalHours, frequency)
+        : null
     setErrors(nextErrors)
-    if (hasErrors(nextErrors)) {
+    setIntervalError(nextIntervalError)
+    if (hasErrors(nextErrors) || nextIntervalError) {
       setError("Please fix the highlighted fields.")
       return
     }
 
     startTransition(async () => {
-      const result = await saveMedicineAction(values, medicine?.id)
+      const result = await saveMedicineAction(
+        values,
+        medicine?.id,
+        values.intervalHours,
+      )
       if (!result.ok) {
         setError(result.error)
         setErrors(result.fieldErrors ?? {})
@@ -331,11 +389,53 @@ export function MedicineForm({
                 {values.scheduleMode === "waking_hours" &&
                   "Spreads doses evenly between the first dose and 10:00 PM."}
                 {values.scheduleMode === "strict_interval" &&
-                  "Calculates exact 24-hour intervals (e.g. 4×/day = every 6 hours)."}
+                  "Spaces doses exactly N hours apart from the first dose."}
                 {values.scheduleMode === "custom" &&
                   "Lets you set an exact clock time for every dose."}
               </p>
             </Field>
+
+            {values.scheduleMode === "strict_interval" ? (
+              <Field
+                label="Every N hours"
+                error={intervalError ?? undefined}
+                htmlFor="medicine-interval"
+              >
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="medicine-interval"
+                    type="number"
+                    inputMode="decimal"
+                    min={MIN_INTERVAL_HOURS}
+                    max={MAX_INTERVAL_HOURS}
+                    step={0.5}
+                    placeholder="6"
+                    value={values.intervalHours}
+                    aria-invalid={Boolean(intervalError)}
+                    aria-describedby={
+                      intervalError
+                        ? "medicine-interval-error"
+                        : "medicine-interval-hint"
+                    }
+                    onChange={(event) => {
+                      setField("intervalHours", event.target.value)
+                      setIntervalError(null)
+                    }}
+                  />
+                  <span className="shrink-0 text-sm text-muted-foreground">
+                    hours
+                  </span>
+                </div>
+                <p
+                  id="medicine-interval-hint"
+                  className="mt-1.5 text-xs leading-relaxed text-muted-foreground"
+                >
+                  Doses are spaced this far apart, starting at the first dose.
+                  For example, 4 doses every 4 hours from 8:00 AM are given at
+                  8:00 AM, 12:00 PM, 4:00 PM, and 8:00 PM.
+                </p>
+              </Field>
+            ) : null}
 
             {values.scheduleMode !== "custom" ? (
               <Field
@@ -386,6 +486,11 @@ export function MedicineForm({
                 <span className="font-medium text-foreground">
                   {previewSlots.length} per day
                 </span>
+                {values.scheduleMode === "strict_interval" &&
+                !intervalProblem &&
+                previewSlots.length > 0
+                  ? ` · every ${values.intervalHours} h`
+                  : null}
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {previewSlots.map((time) => (
@@ -396,7 +501,22 @@ export function MedicineForm({
                     {formatTime12h(time)}
                   </span>
                 ))}
+                {previewSlots.length === 0 ? (
+                  <span className="text-[11px] text-muted-foreground">
+                    Fix the interval to see the daily times.
+                  </span>
+                ) : null}
               </div>
+              {strictCycleWait > 0 && previewSlots.length > 1 ? (
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  The next day&apos;s cycle starts at{" "}
+                  <span className="font-medium text-foreground">
+                    {formatTime12h(previewSlots[0])}
+                  </span>{" "}
+                  — {formatGapHours(strictCycleWait)} after the{" "}
+                  {formatTime12h(previewSlots[previewSlots.length - 1])} dose.
+                </p>
+              ) : null}
             </div>
           </fieldset>
 
@@ -541,6 +661,12 @@ function Field({
   )
 }
 
+/** "12 h" or "10.5 h" for the wait between a cycle's last and next first dose. */
+function formatGapHours(minutes: number): string {
+  const hours = minutes / 60
+  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} h`
+}
+
 function ScheduleModeInfo() {
   return (
     <Popover>
@@ -570,8 +696,9 @@ function ScheduleModeInfo() {
           <div>
             <p className="font-medium text-foreground">Strict every N hours</p>
             <p className="text-muted-foreground">
-              Divides 24 hours by frequency — ideal for round-the-clock
-              antibiotics.
+              Spaces doses exactly N hours apart from the first dose — ideal for
+              round-the-clock antibiotics. E.g. 4 doses every 4 hours from 8:00
+              AM: 8:00 AM, 12:00 PM, 4:00 PM, 8:00 PM.
             </p>
           </div>
           <div>
