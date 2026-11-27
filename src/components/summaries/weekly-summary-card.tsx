@@ -1,7 +1,14 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Check, FileClock, RefreshCcw, Sparkles } from "lucide-react"
+import { useRouter } from "next/navigation"
+import {
+  Check,
+  FileClock,
+  Loader2,
+  RefreshCcw,
+  Sparkles,
+} from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -40,7 +47,9 @@ export function WeeklySummaryCard({
 }) {
   const [language, setLanguage] = useState<Language>("en")
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
 
   const prose = summary
     ? language === "en"
@@ -48,11 +57,22 @@ export function WeeklySummaryCard({
       : summary.summaryFil
     : null
 
-  function run(action: () => Promise<{ ok: boolean; error?: string }>) {
+  function run(
+    action: () => Promise<{ ok: boolean; error?: string }>,
+    successMessage: string,
+  ) {
     setError(null)
+    setNotice(null)
     startTransition(async () => {
       const result = await action()
-      if (!result.ok) setError(result.error ?? "Something went wrong.")
+      if (!result.ok) {
+        setError(result.error ?? "Something went wrong.")
+        return
+      }
+      setNotice(successMessage)
+      // The action revalidated the route; this swaps the stale card for the
+      // written one without asking for a manual reload.
+      router.refresh()
     })
   }
 
@@ -178,6 +198,24 @@ export function WeeklySummaryCard({
           </p>
         )}
 
+        <div role="status" aria-live="polite">
+          {isPending ? (
+            <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+              <Loader2
+                aria-hidden="true"
+                className="mt-0.5 size-3.5 shrink-0 animate-spin"
+              />
+              Writing this week’s summary from its frozen record. This can take
+              a few seconds.
+            </p>
+          ) : notice ? (
+            <p className="flex items-start gap-1.5 text-xs font-medium text-sage-ink">
+              <Check aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+              {notice}
+            </p>
+          ) : null}
+        </div>
+
         {error ? (
           <p role="alert" className="text-xs text-destructive">
             {error}
@@ -191,18 +229,30 @@ export function WeeklySummaryCard({
             variant={summary ? "outline" : "default"}
             disabled={isPending}
             onClick={() =>
-              run(() =>
-                generateWeeklySummaryAction({ patientId, weekStart, timeZone }),
+              run(
+                () =>
+                  generateWeeklySummaryAction({
+                    patientId,
+                    weekStart,
+                    timeZone,
+                  }),
+                summary
+                  ? "Summary rewritten. Review the new draft, then mark it reviewed."
+                  : "Summary written. Review the draft on this card, then mark it reviewed.",
               )
             }
           >
-            {summary ? (
+            {isPending ? (
+              <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+            ) : summary ? (
               <RefreshCcw aria-hidden="true" className="size-4" />
             ) : (
               <Sparkles aria-hidden="true" className="size-4" />
             )}
             {isPending
-              ? "Writing…"
+              ? summary
+                ? "Regenerating…"
+                : "Writing…"
               : summary
                 ? "Regenerate"
                 : "Write summary"}
@@ -215,8 +265,12 @@ export function WeeklySummaryCard({
               variant={summary.isReviewed ? "ghost" : "outline"}
               disabled={isPending}
               onClick={() =>
-                run(() =>
-                  markSummaryReviewedAction(summary.id, !summary.isReviewed),
+                run(
+                  () =>
+                    markSummaryReviewedAction(summary.id, !summary.isReviewed),
+                  summary.isReviewed
+                    ? "Review cleared — this week is a draft again."
+                    : "Marked as reviewed.",
                 )
               }
             >
