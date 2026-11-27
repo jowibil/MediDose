@@ -1,4 +1,4 @@
-import { addISODays, parseISODate } from "@/lib/dates"
+import { addISODays, normalizeTime, parseISODate } from "@/lib/dates"
 import type { DoseLogRow } from "@/lib/occurrences"
 import { occurrenceKey, occurrencesForRange } from "@/lib/schedule"
 import type { Medicine, SkipReason } from "@/types/medicine"
@@ -61,7 +61,11 @@ export function weekSlotKey(slot: {
   scheduledDate: string
   scheduledTime: string
 }): string {
-  return occurrenceKey(slot.medicineId, slot.scheduledDate, slot.scheduledTime)
+  return occurrenceKey(
+    slot.medicineId,
+    slot.scheduledDate,
+    normalizeTime(slot.scheduledTime),
+  )
 }
 
 /**
@@ -89,9 +93,16 @@ export function buildWeekStats({
 
   const dueSlots = slots.filter((slot) => slot.scheduledDate <= cutoff)
   const slotKeys = new Set(slots.map((slot) => weekSlotKey(slot)))
+  // A slot that came from a frozen row is "HH:MM:SS" (Postgres `time`) while
+  // one built in TypeScript is "HH:MM". Both sides go through the same key, so
+  // a logged dose can never be read as off-plan against its own scheduled slot.
   const logByKey = new Map(
     logs.map((log) => [
-      occurrenceKey(log.medicine_id, log.scheduled_date, log.scheduled_time),
+      occurrenceKey(
+        log.medicine_id,
+        log.scheduled_date,
+        normalizeTime(log.scheduled_time),
+      ),
       log,
     ]),
   )
@@ -120,7 +131,11 @@ export function buildWeekStats({
       log.scheduled_date >= start &&
       log.scheduled_date <= cutoff &&
       !slotKeys.has(
-        occurrenceKey(log.medicine_id, log.scheduled_date, log.scheduled_time),
+        occurrenceKey(
+          log.medicine_id,
+          log.scheduled_date,
+          normalizeTime(log.scheduled_time),
+        ),
       ),
   ).length
 

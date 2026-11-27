@@ -30,7 +30,8 @@ export default async function SummariesPage() {
   const weekStart = currentWeekStart(todayIso)
 
   // The dashboard also does this; the page must work on a direct visit. It is
-  // idempotent and skips the RPC when the week is already frozen.
+  // idempotent, and a frozen week only gains the slots of a medicine that
+  // started after the freeze.
   const weekFrozen = await ensureWeekFrozen(active.id, weekStart, timeZone)
 
   const summaries = await getWeeklySummaries(active.id, WEEKS_SHOWN)

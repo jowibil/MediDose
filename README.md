@@ -212,7 +212,11 @@ dose to another date in history.
 
 A disposal is the only mid-week change that removes expected doses from a frozen
 week (a damaged or mistaken medicine must not depress adherence), which is why
-undo has to restore them.
+undo has to restore them. The mirror case is a medicine added mid-week: the week
+froze before it existed, so `extend_week_plan()` adds its doses for the week in
+progress — otherwise every dose of it is counted as off-plan. A medicine already
+in the plan is never extended, so editing a schedule still cannot rewrite the
+week.
 
 ## Security
 

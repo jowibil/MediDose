@@ -23,9 +23,9 @@ import {
 import { buildSummaryUserPrompt, SUMMARY_SYSTEM_PROMPT } from "@/lib/ai/prompts"
 
 /**
- * Freezes the week if it is not frozen yet. Called from the dashboard on every
- * visit, so it never throws and never blocks the page. `freeze_week` is
- * idempotent, and the select below skips the RPC entirely for the common case.
+ * Freezes the week if it is not frozen yet, and adds the slots of any medicine
+ * that started after the week froze. Called from the dashboard on every visit,
+ * so it never throws and never blocks the page.
  *
  * Returns whether the week is frozen. A failed RPC used to be dropped on the
  * floor: the page rendered as "untracked", the summary was then written from an
@@ -41,9 +41,6 @@ export async function ensureWeekFrozen(
   if (!context || !canAccessPatient(context, patientId)) return false
 
   const supabase = await createSupabaseServerClient()
-  const plan = await getWeekPlan(patientId, weekStart)
-  if (plan) return true
-
   const medicines = await getMedicinesIncludingArchived(patientId)
   const slots = buildWeekSlots(medicines, weekStart).map((slot) => ({
     medicine_id: slot.medicineId,
@@ -51,6 +48,31 @@ export async function ensureWeekFrozen(
     date: slot.scheduledDate,
     time: slot.scheduledTime,
   }))
+
+  const plan = await getWeekPlan(patientId, weekStart)
+
+  // A medicine started after the freeze has no expected_doses rows, so every
+  // dose of it was counted as off-plan and the week reported "no scheduled
+  // doses" while the caregiver logged four. `extend_week_plan` adds only the
+  // medicines the frozen week never captured; everything it did capture stays
+  // untouched, which is what keeps a schedule edit from moving the numbers.
+  if (plan) {
+    const { error } = await supabase.rpc("extend_week_plan", {
+      p_patient_id: patientId,
+      p_week_start: weekStart,
+      p_slots: slots,
+    })
+
+    if (error) {
+      console.error("summary: extend_week_plan failed", {
+        patientId,
+        weekStart,
+        code: error.code,
+      })
+    }
+
+    return true
+  }
 
   const { error } = await supabase.rpc("freeze_week", {
     p_patient_id: patientId,

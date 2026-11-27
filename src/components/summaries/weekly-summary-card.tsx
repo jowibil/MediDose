@@ -180,8 +180,9 @@ export function WeeklySummaryCard({
             </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                The week is frozen and its numbers are final. Write the summary
-                when you are ready to review the prose.
+                The week is frozen, so its numbers stay tied to the plan it
+                captured. Write the summary when you are ready to review the
+                prose.
               </p>
             )}
 
@@ -193,8 +194,8 @@ export function WeeklySummaryCard({
           </>
         ) : (
           <p className="text-sm text-muted-foreground">
-            The week is frozen, so its numbers will not change. Write the summary
-            when you are ready to review it.
+            The week is frozen, so its numbers stay tied to the plan it
+            captured. Write the summary when you are ready to review it.
           </p>
         )}
 
