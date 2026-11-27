@@ -5,6 +5,7 @@ import {
   formatTime12h,
   occurrencesForDate,
   occurrencesForRange,
+  scheduleTimesInIntakeOrder,
   timeSlotsForFrequency,
 } from "@/lib/schedule"
 
@@ -76,7 +77,108 @@ describe("timeSlotsForFrequency", () => {
   })
 })
 
+/** 4 doses every 6 hours from 3:00 PM, as stored (sorted) and as taken. */
+function strictWrappingMedicine(overrides: Partial<Medicine> = {}): Medicine {
+  return medicine({
+    scheduleMode: "strict_interval",
+    frequencyPerDay: 4,
+    firstDoseTime: "15:00",
+    scheduleTimes: ["03:00", "09:00", "15:00", "21:00"],
+    createdDate: "2026-11-27",
+    ...overrides,
+  })
+}
+
+describe("scheduleTimesInIntakeOrder", () => {
+  it("starts a wrapping strict cycle at its first dose", () => {
+    expect(scheduleTimesInIntakeOrder(strictWrappingMedicine())).toEqual([
+      "15:00",
+      "21:00",
+      "03:00",
+      "09:00",
+    ])
+  })
+
+  it("leaves a cycle that starts at its earliest slot alone", () => {
+    const daytime = strictWrappingMedicine({
+      firstDoseTime: "08:00",
+      scheduleTimes: ["08:00", "12:00", "16:00", "20:00"],
+    })
+    expect(scheduleTimesInIntakeOrder(daytime)).toEqual([
+      "08:00",
+      "12:00",
+      "16:00",
+      "20:00",
+    ])
+  })
+
+  it("keeps a custom schedule in the order it was typed", () => {
+    const custom = medicine({
+      scheduleMode: "custom",
+      frequencyPerDay: 4,
+      customTimes: ["15:00", "21:00", "03:00", "09:00"],
+      scheduleTimes: ["03:00", "09:00", "15:00", "21:00"],
+    })
+    expect(scheduleTimesInIntakeOrder(custom)).toEqual([
+      "15:00",
+      "21:00",
+      "03:00",
+      "09:00",
+    ])
+  })
+
+  it("keeps waking-hours slots chronological", () => {
+    expect(scheduleTimesInIntakeOrder(medicine())).toEqual([
+      "08:00",
+      "15:00",
+      "22:00",
+    ])
+  })
+})
+
 describe("occurrences", () => {
+  it("skips slots before the first dose on a strict medicine's creation day", () => {
+    const med = strictWrappingMedicine()
+    expect(
+      occurrencesForDate(med, "2026-11-27").map((o) => o.scheduledTime),
+    ).toEqual(["15:00", "21:00"])
+    // The next day is a full cycle: 3:00 AM is the third dose of it.
+    expect(occurrencesForDate(med, "2026-11-28")).toHaveLength(4)
+  })
+
+  it("starts a custom schedule's creation day at the first time typed", () => {
+    const med = medicine({
+      scheduleMode: "custom",
+      frequencyPerDay: 4,
+      customTimes: ["15:00", "21:00", "03:00", "09:00"],
+      scheduleTimes: ["03:00", "09:00", "15:00", "21:00"],
+      createdDate: "2026-11-27",
+      createdAt: "2026-11-27T07:00:00.000Z",
+    })
+
+    expect(
+      occurrencesForDate(med, "2026-11-27", "Asia/Singapore").map(
+        (o) => o.scheduledTime,
+      ),
+    ).toEqual(["15:00", "21:00"])
+    expect(occurrencesForDate(med, "2026-11-28", "Asia/Singapore")).toHaveLength(4)
+  })
+
+  it("skips the doses that had already passed when a waking-hours medicine was added", () => {
+    const med = medicine({
+      createdDate: "2026-11-27",
+      // 07:00 UTC is 3:00 PM in the household's timezone.
+      createdAt: "2026-11-27T07:00:00.000Z",
+    })
+
+    expect(
+      occurrencesForDate(med, "2026-11-27", "Asia/Singapore").map(
+        (o) => o.scheduledTime,
+      ),
+    ).toEqual(["15:00", "22:00"])
+    expect(occurrencesForDate(med, "2026-11-28", "Asia/Singapore")).toHaveLength(3)
+  })
+
   it("generates one occurrence per schedule slot", () => {
     const occurrences = occurrencesForDate(medicine(), "2026-11-25")
     expect(occurrences.map((o) => o.scheduledTime)).toEqual([

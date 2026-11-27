@@ -1,5 +1,10 @@
 import type { DoseOccurrence, Medicine, ScheduleMode } from "@/types/medicine"
-import { addLocalDays, parseISODate, toISODate } from "@/lib/dates"
+import {
+  addLocalDays,
+  normalizeTime,
+  parseISODate,
+  toISODate,
+} from "@/lib/dates"
 
 /** Default first dose of the day when a medicine has no custom start time set. */
 const DEFAULT_FIRST_DOSE_TIME = "08:00"
@@ -85,6 +90,33 @@ export function scheduleTimesForMedicine(medicine: Medicine): string[] {
 }
 
 /**
+ * The daily slots in the order they are taken, starting at the first dose.
+ *
+ * `schedule_times` is stored sorted by clock time, so a strict cycle that wraps
+ * past midnight is saved as "03:00", "09:00", "15:00", "21:00" — which reads as
+ * if the day began at 3:00 AM. Rotating to the first dose restores the regimen
+ * as it was prescribed: 3:00 PM, 9:00 PM, 3:00 AM, 9:00 AM.
+ */
+export function scheduleTimesInIntakeOrder(medicine: Medicine): string[] {
+  // A custom schedule was typed time by time, so the typed order is the one the
+  // owner asked for; `custom_times` keeps it while `schedule_times` is sorted.
+  if (medicine.scheduleMode === "custom" && medicine.customTimes?.length) {
+    return medicine.customTimes.map((time) => normalizeTime(time))
+  }
+
+  const times = scheduleTimesForMedicine(medicine)
+    .map((time) => normalizeTime(time))
+    .sort()
+
+  if (medicine.scheduleMode !== "strict_interval" || times.length < 2) {
+    return times
+  }
+
+  const start = times.indexOf(normalizeTime(medicine.firstDoseTime))
+  return start <= 0 ? times : [...times.slice(start), ...times.slice(0, start)]
+}
+
+/**
  * True when a date falls within the medicine's active window. Archived
  * medicines stop generating occurrences after their archive date but keep
  * their earlier history readable.
@@ -101,26 +133,92 @@ export function isMedicineActiveOn(
   return true
 }
 
-/** Pending occurrences for one medicine on one local date. */
+/**
+ * Local clock time ("HH:MM") of an ISO timestamp, or null when either the
+ * timestamp or the timezone cannot be read. Only a medicine's creation day
+ * needs it, so an unusable value just leaves the schedule's start in charge.
+ */
+function clockTimeInTimeZone(
+  isoTimestamp: string,
+  timeZone: string,
+): string | null {
+  const instant = new Date(isoTimestamp)
+  if (Number.isNaN(instant.getTime())) return null
+
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(instant)
+    const hour = parts.find((part) => part.type === "hour")?.value
+    const minute = parts.find((part) => part.type === "minute")?.value
+    return hour && minute ? `${hour}:${minute}` : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The clock time a medicine's first day starts at: its first dose of the day,
+ * or the moment it was added when that is later.
+ *
+ * A schedule is a whole day of clock times, so without this the doses that had
+ * already passed when the medicine was added appear as pending on its own first
+ * day. A strict cycle stored as 03:00/09:00/15:00/21:00 put a 3:00 AM dose on
+ * the dashboard for a medicine added at 3:00 PM; a custom schedule typed as
+ * 15:00/21:00/03:00/09:00 did the same; and a waking-hours medicine added in
+ * the afternoon showed the 8:00 AM first dose. Each one asked for a log of a
+ * dose that was never due.
+ */
+function firstDayStartTime(medicine: Medicine, timeZone?: string): string {
+  const firstDose = normalizeTime(
+    scheduleTimesInIntakeOrder(medicine)[0] ?? medicine.firstDoseTime,
+  )
+  const addedAt = timeZone
+    ? clockTimeInTimeZone(medicine.createdAt, timeZone)
+    : null
+  return addedAt && addedAt > firstDose ? addedAt : firstDose
+}
+
+/**
+ * Pending occurrences for one medicine on one local date.
+ *
+ * Only the creation day is trimmed. Every later day keeps the whole set,
+ * because a slot before the first dose belongs to the cycle that began the
+ * previous day.
+ */
 export function occurrencesForDate(
   medicine: Medicine,
   dateIso: string,
+  timeZone?: string,
 ): DoseOccurrence[] {
   if (!isMedicineActiveOn(medicine, dateIso)) return []
-  return scheduleTimesForMedicine(medicine).map((time) => ({
-    medicineId: medicine.id,
-    patientId: medicine.patientId,
-    scheduledDate: dateIso,
-    scheduledTime: time,
-    status: "pending" as const,
-  }))
+  const firstDayStart =
+    dateIso === medicine.createdDate
+      ? firstDayStartTime(medicine, timeZone)
+      : null
+  return scheduleTimesForMedicine(medicine)
+    .filter((time) => firstDayStart === null || normalizeTime(time) >= firstDayStart)
+    .map((time) => ({
+      medicineId: medicine.id,
+      patientId: medicine.patientId,
+      scheduledDate: dateIso,
+      scheduledTime: time,
+      status: "pending" as const,
+    }))
 }
 
-/** Pending occurrences for one medicine across an inclusive date range. */
+/**
+ * Pending occurrences for one medicine across an inclusive date range. Pass the
+ * household timezone so the creation day starts at the local time it was added.
+ */
 export function occurrencesForRange(
   medicine: Medicine,
   startIso: string,
   endIso: string,
+  timeZone?: string,
 ): DoseOccurrence[] {
   if (endIso < startIso) return []
   const occurrences: DoseOccurrence[] = []
@@ -128,7 +226,7 @@ export function occurrencesForRange(
   const end = parseISODate(endIso)
 
   while (cursor.getTime() <= end.getTime()) {
-    occurrences.push(...occurrencesForDate(medicine, toISODate(cursor)))
+    occurrences.push(...occurrencesForDate(medicine, toISODate(cursor), timeZone))
     cursor = addLocalDays(cursor, 1)
   }
 

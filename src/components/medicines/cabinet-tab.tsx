@@ -15,7 +15,7 @@ import {
   DisposeMedicineButton,
 } from "@/components/medicines/medicine-actions"
 import { RestockDialog } from "@/components/medicines/restock-dialog"
-import { formatTime12h } from "@/lib/schedule"
+import { formatTime12h, scheduleTimesInIntakeOrder } from "@/lib/schedule"
 import { formatDosage } from "@/lib/mappers"
 
 const MODE_LABEL = {
@@ -94,7 +94,7 @@ export function CabinetTab({
             <SupplyMeter medicine={medicine} now={now} />
 
             <div className="flex flex-wrap items-center gap-1.5">
-              {medicine.scheduleTimes.map((time) => (
+              {scheduleTimesInIntakeOrder(medicine).map((time) => (
                 <span
                   key={time}
                   className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground"

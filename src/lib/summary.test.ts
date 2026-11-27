@@ -100,6 +100,39 @@ describe("buildWeekSlots", () => {
     expect(renamed.name).not.toBe(slots[0]?.medicineName)
   })
 
+  it("leaves a week that is already frozen exactly as it was", () => {
+    // Added at 3:00 PM local, so its 8:00 AM dose never existed that day.
+    const started = medicine({
+      createdDate: "2026-11-25",
+      createdAt: "2026-11-25T07:00:00.000Z",
+      scheduleTimes: ["08:00", "20:00"],
+    })
+    const fresh = buildWeekSlots([started], WEEK, "Asia/Singapore")
+    expect(
+      fresh
+        .filter((slot) => slot.scheduledDate === "2026-11-25")
+        .map((slot) => slot.scheduledTime),
+    ).toEqual(["20:00"])
+
+    // A plan frozen before that rule keeps the 8:00 AM slot it recorded, so its
+    // counters do not move.
+    const stats = buildWeekStats({
+      slots: [
+        {
+          medicineId: "m1",
+          medicineName: "Amoxicillin",
+          scheduledDate: "2026-11-25",
+          scheduledTime: "08:00",
+        },
+      ],
+      logs: [],
+      weekStart: WEEK,
+      todayIso: "2026-11-29",
+      planTracked: true,
+    })
+    expect(stats.expected).toBe(1)
+  })
+
   it("stops at the medicine's archive date", () => {
     const slots = buildWeekSlots(
       [medicine({ archivedAt: "2026-11-25T10:00:00.000Z", archivedDate: "2026-11-25" })],

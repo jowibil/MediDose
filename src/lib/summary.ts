@@ -43,11 +43,12 @@ export function weekRange(weekStart: string): { start: string; end: string } {
 export function buildWeekSlots(
   medicines: Medicine[],
   weekStart: string,
+  timeZone?: string,
 ): WeekSlot[] {
   const { start, end } = weekRange(weekStart)
 
   return medicines.flatMap((medicine) =>
-    occurrencesForRange(medicine, start, end).map((occurrence) => ({
+    occurrencesForRange(medicine, start, end, timeZone).map((occurrence) => ({
       medicineId: occurrence.medicineId,
       medicineName: medicine.name,
       scheduledDate: occurrence.scheduledDate,

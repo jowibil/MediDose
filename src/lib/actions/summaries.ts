@@ -42,7 +42,7 @@ export async function ensureWeekFrozen(
 
   const supabase = await createSupabaseServerClient()
   const medicines = await getMedicinesIncludingArchived(patientId)
-  const slots = buildWeekSlots(medicines, weekStart).map((slot) => ({
+  const slots = buildWeekSlots(medicines, weekStart, timeZone).map((slot) => ({
     medicine_id: slot.medicineId,
     medicine_name: slot.medicineName,
     date: slot.scheduledDate,

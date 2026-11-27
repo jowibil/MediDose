@@ -128,6 +128,9 @@ export function validateMedicineForm(
       errors.customTimes = `Enter exactly ${frequency} custom time${frequency === 1 ? "" : "s"}.`
     } else if (values.customTimes.some((time) => !isValidTime(time))) {
       errors.customTimes = "All custom times must be valid HH:MM formats."
+    } else if (new Set(values.customTimes).size !== values.customTimes.length) {
+      errors.customTimes =
+        "Each custom time must be different — two doses cannot share a clock time."
     }
   }
 

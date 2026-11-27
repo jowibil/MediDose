@@ -116,7 +116,7 @@ export default async function HistoryPage({
 
   const occurrences = mergeOccurrences(
     scopedMedicines.flatMap((medicine) =>
-      occurrencesForRange(medicine, fromIso, toIso),
+      occurrencesForRange(medicine, fromIso, toIso, timeZone),
     ),
     logs,
     names,

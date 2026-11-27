@@ -70,7 +70,7 @@ export default async function DashboardPage() {
   )
 
   const rangeOccurrences = medicines.flatMap((medicine) =>
-    occurrencesForRange(medicine, todayIso, endIso),
+    occurrencesForRange(medicine, todayIso, endIso, timeZone),
   )
   const merged = mergeOccurrences(rangeOccurrences, logs, names)
 

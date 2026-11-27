@@ -110,6 +110,17 @@ describe("validateMedicineForm", () => {
       ).customTimes,
     ).toContain("HH:MM")
   })
+
+  it("rejects two custom doses at the same clock time", () => {
+    const form = {
+      ...valid,
+      scheduleMode: "custom" as const,
+      customTimes: ["08:00", "08:00", "19:00"],
+    }
+    expect(validateMedicineForm(form, options).customTimes).toContain(
+      "must be different",
+    )
+  })
 })
 
 describe("validateSkipInput", () => {

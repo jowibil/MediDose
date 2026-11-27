@@ -10,6 +10,7 @@ import { MAX_FREQUENCY, MIN_FREQUENCY } from "@/types/medicine"
 import type { MedicineFormErrors, MedicineFormValues } from "@/lib/validation"
 import { hasErrors, validateMedicineForm } from "@/lib/validation"
 import { calculateSupply, supplyBadgeVariant } from "@/lib/supply"
+import { isValidTime } from "@/lib/dates"
 import { formatTime12h, timeSlotsForFrequency } from "@/lib/schedule"
 import {
   MAX_INTERVAL_HOURS,
@@ -126,12 +127,15 @@ export function MedicineForm({
             values.firstDoseTime || "08:00",
             Number(values.intervalHours),
           )
-      : timeSlotsForFrequency(
-          frequency,
-          values.firstDoseTime || "08:00",
-          values.scheduleMode,
-          values.scheduleMode === "custom" ? values.customTimes : [],
-        )
+      : values.scheduleMode === "custom"
+        ? // The owner's own list, in the order they typed it.
+          values.customTimes.filter((time) => isValidTime(time))
+        : timeSlotsForFrequency(
+            frequency,
+            values.firstDoseTime || "08:00",
+            values.scheduleMode,
+            [],
+          )
   const strictCycleWait =
     values.scheduleMode === "strict_interval" && !intervalProblem
       ? strictCycleWaitMinutes(frequency, Number(values.intervalHours))
@@ -152,10 +156,21 @@ export function MedicineForm({
       }
     }
     if (values.scheduleMode === "custom" && Number.isInteger(nextFrequency)) {
-      const times = [...values.customTimes]
-      while (times.length < nextFrequency) times.push("12:00")
-      times.splice(nextFrequency)
-      setField("customTimes", times)
+      // Keep what the owner already typed; fill any new box with a distinct
+      // time from the schedule instead of repeating one placeholder.
+      const seeded = timeSlotsForFrequency(
+        nextFrequency,
+        values.firstDoseTime || "08:00",
+        "waking_hours",
+        [],
+      )
+      setField(
+        "customTimes",
+        Array.from(
+          { length: nextFrequency },
+          (_, index) => values.customTimes[index] ?? seeded[index] ?? "08:00",
+        ),
+      )
     }
   }
 
@@ -169,13 +184,25 @@ export function MedicineForm({
     }
     if (mode === "custom") {
       const count = Number(values.frequencyPerDay) || 1
-      setField(
-        "customTimes",
-        Array.from(
-          { length: count },
-          (_, index) => values.customTimes[index] ?? values.firstDoseTime ?? "08:00",
-        ),
-      )
+      // Seed from the schedule being replaced — the strict cycle or the
+      // waking-hours spread — so every box starts at a different, meaningful
+      // time. Seeding all of them from the first dose saved identical slots,
+      // which looked like the form had ignored the times that were typed.
+      const seeded =
+        values.scheduleMode === "strict_interval" &&
+        !validateIntervalHours(values.intervalHours, count)
+          ? strictIntervalDoseSlots(
+              count,
+              values.firstDoseTime || "08:00",
+              Number(values.intervalHours),
+            )
+          : timeSlotsForFrequency(
+              count,
+              values.firstDoseTime || "08:00",
+              "waking_hours",
+              [],
+            )
+      setField("customTimes", seeded)
     }
   }
 
@@ -469,9 +496,15 @@ export function MedicineForm({
                         type="time"
                         value={values.customTimes[index] ?? "08:00"}
                         onChange={(event) => {
-                          const next = [...values.customTimes]
-                          next[index] = event.target.value
-                          setField("customTimes", next)
+                          // Update from the latest state, never this render's
+                          // copy: a second edit in the same tick would
+                          // otherwise restore the times it never saw.
+                          const value = event.target.value
+                          setValues((previous) => {
+                            const next = [...previous.customTimes]
+                            next[index] = value
+                            return { ...previous, customTimes: next }
+                          })
                         }}
                       />
                     </div>
