@@ -34,7 +34,7 @@ export function DoseControls({
   timeZone: string
   role: HouseholdRole
   readOnly?: boolean
-  /** False where the surface must not start a dose (an owner's dashboard). */
+  /** False where the surface must not start a dose (an owner in History). */
   canLog?: boolean
 }) {
   // A patient may record a dose but never revise one: re-marking taken →
@@ -125,9 +125,10 @@ export function DoseControls({
     )
   }
 
-  // History is a record, not a place to act: the dashboard is where doses are
-  // logged, so a patient sees the status only and staff keep the correction
-  // controls.
+  // Some surfaces report rather than act. History is where staff log and
+  // correct, so the staff dashboard and a patient's History show the status
+  // badge only; a patient still logs from the dashboard, which is the one place
+  // they may write.
   if (readOnly) {
     return (
       <div className="flex w-full sm:w-auto sm:justify-end">

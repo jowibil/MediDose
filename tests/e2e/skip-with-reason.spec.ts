@@ -16,6 +16,8 @@ test("caregiver skips a dose with a reason and filters history", async ({
   await page.getByLabel("Active patient").click()
   await page.getByRole("option", { name: "Alex" }).click()
 
+  // The dashboard is read-only for staff, so the dose is logged from History.
+  await page.goto("/history")
   await page.getByRole("button", { name: "Skip" }).first().click()
 
   await expect(

@@ -21,7 +21,7 @@ TypeScript)** with **Supabase** (Postgres, Auth, Row Level Security).
 - **Caregiver households** — owners create a household with a six-character
   invite code; caregivers join and see a grouped, single-patient top-bar
   selector. Owners manage patients and medicines and correct logged doses;
-  caregivers log doses, correct them, and restock.
+  caregivers log doses from History, correct them, and restock.
 - **Audited stock** — every delta (initial, dose taken, reverted, restock,
   owner edit) is recorded in `stock_adjustments`.
 - **Expiration board** — Safe / Expiring soon (≤30 days) / Expired, with
@@ -30,7 +30,9 @@ TypeScript)** with **Supabase** (Postgres, Auth, Row Level Security).
   patient record through a six-character link code the owner issues. A patient
   sees only their own doses and history, logs pending doses from the dashboard,
   and can correct nothing (History is read-only); a caregiver logs and corrects
-  doses, while an owner corrects Taken ↔ Skipped rather than logging a new one.
+  doses in History, while an owner corrects Taken ↔ Skipped there rather than
+  logging a new one. Both see today's status, with no controls, on the
+  dashboard.
 - **Weekly summaries** — the first visit to a week freezes its expected doses, so
   later schedule edits cannot rewrite it. AI writes an English + Filipino
   summary from those frozen counters; a person marks it reviewed, and
@@ -52,15 +54,23 @@ TypeScript)** with **Supabase** (Postgres, Auth, Row Level Security).
 
 | Capability | Owner | Caregiver | Patient account |
 | --- | --- | --- | --- |
-| View patients, medicines, doses, ledger | Own household | Linked households | Own record only |
-| Create/edit/archive/purge/dispose patients & medicines | Yes | No | No |
-| Log Taken/Skipped | No — corrects only | Yes | Own doses, from the dashboard |
+| **Dashboard** dose rows | Status only — Pending / Taken / Skipped | Status only — Pending / Taken / Skipped | Status, plus **Take** / **Skip** on their own doses |
+| **History** dose rows | Correct Taken ↔ Skipped or the skip reason — no new log | Log a pending dose, correct a logged one, change a skip reason | Read-only status |
+| Log a new Taken / Skipped dose | No — corrections only | Yes, from History | Yes, own doses, from the dashboard |
 | Correct Taken ↔ Skipped | Yes | Yes | No — asks a caregiver |
+| View patients, medicines, doses, stock ledger | Own household | Linked households | Own record only |
+| Create / edit / archive / purge / dispose patients & medicines | Yes | No | No |
 | Restock | Yes | Yes | No |
-| Weekly summaries, assistant | Yes | Yes | Assistant only |
-| View/regenerate invite code, rename household, remove caregivers | Yes | No | No |
-| Join another household | No (fixed role) | Yes, many | Bound to one patient |
-| Redeem a patient link code | Issues it | — | Yes, once |
+| Weekly summaries | Yes | Yes | No |
+| Bilingual assistant | Whole household | Its patients | Own record + app guidance |
+| View / regenerate the invite code, rename household, remove caregivers | Yes | No | No |
+| Join another household | No (fixed role) | Yes, many | No — bound to one patient record |
+| Issue / redeem a patient link code | Issues it | — | Redeems it, once |
+
+A dose action lives in exactly one place per role: an owner and a caregiver
+read today's status on the dashboard and act in History, while a patient account
+is the reverse — it logs from the dashboard and reads History as a record. That
+is why a staff dashboard row has no Take, Skip, Undo or Mark taken button.
 
 Roles are chosen at signup and cannot change. An owner has exactly one
 household and can never join another. A patient account is one patient record in
@@ -240,9 +250,10 @@ The pre-rework app stored data in `localStorage`. No legacy data existed, so
 - `supabase/tests/rls.test.sql` — owner/caregiver/unlinked assertions plus a
   linked patient account: it can log its own dose, an owner cannot log at all,
   and a sibling patient's dose is refused with nothing written.
-- `tests/e2e/*.spec.ts` — skip-with-reason, caregiver join/switch/restock, and
-  caregiver edit denial (including direct REST calls). The three-role, summary,
-  pharmacy and disposal flows are not in the E2E suite yet.
+- `tests/e2e/*.spec.ts` — skip-with-reason (run from History), caregiver
+  join/switch/restock/log, and caregiver edit denial (including direct REST
+  calls). The three-role, summary, pharmacy and disposal flows are not in the
+  E2E suite yet.
 - `scripts/check-role-chat.ts` — end-to-end for `/api/ai/chat`: creates a
   disposable owner/caregiver/two-patient household, calls the route with a real
   session per role, and asserts the owner and caregiver records carry the

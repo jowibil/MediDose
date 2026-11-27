@@ -31,7 +31,8 @@ test("caregiver joins, switches patients, restocks, and logs a dose", async ({
   await page.getByRole("button", { name: "Add stock" }).click()
   await expect(page.getByRole("button", { name: "Restock" }).first()).toBeVisible()
 
-  await page.goto("/dashboard")
+  // Logging happens in History; the dashboard only reports the status.
+  await page.goto("/history")
   await page.getByRole("button", { name: "Take" }).first().click()
   await expect(page.getByText("Taken").first()).toBeVisible()
 })

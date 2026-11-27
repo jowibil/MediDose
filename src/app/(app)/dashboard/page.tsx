@@ -314,7 +314,9 @@ export default async function DashboardPage() {
                               stock={medicine.stock}
                               timeZone={timeZone}
                               role={context.role}
-                              canLog={context.role !== "owner"}
+                              // Staff see today's status here and act in History, so
+                              // the same dose is never logged from two places.
+                              readOnly={context.role !== "patient"}
                             />
                           </li>
                         )
