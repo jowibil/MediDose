@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Check, RotateCcw, XCircle } from "lucide-react"
+import { Check, Clock3, RotateCcw, XCircle } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -26,11 +26,13 @@ export function DoseControls({
   stock,
   timeZone,
   role,
+  readOnly = false,
 }: {
   occurrence: DoseOccurrence
   stock: number
   timeZone: string
   role: HouseholdRole
+  readOnly?: boolean
 }) {
   // A patient may record a dose but never revise one: re-marking taken →
   // skipped returns stock, which is a caregiver's job. The persistent line
@@ -117,6 +119,32 @@ export function DoseControls({
         }),
       `Dose marked skipped — ${skipReasonLabel(reason)}.`,
       () => setDialogMode(null),
+    )
+  }
+
+  // History is a record, not a place to act: the dashboard is where doses are
+  // logged, so a patient sees the status only and staff keep the correction
+  // controls.
+  if (readOnly) {
+    return (
+      <div className="flex w-full sm:w-auto sm:justify-end">
+        {pending ? (
+          <Badge variant="outline">
+            <Clock3 aria-hidden="true" className="size-3.5" />
+            Pending
+          </Badge>
+        ) : occurrence.status === "taken" ? (
+          <Badge variant="safe">
+            <Check aria-hidden="true" className="size-3.5" />
+            Taken
+          </Badge>
+        ) : (
+          <Badge variant="expiring">
+            <XCircle aria-hidden="true" className="size-3.5" />
+            Skipped{skipReason ? ` · ${skipReasonLabel(skipReason)}` : ""}
+          </Badge>
+        )}
+      </div>
     )
   }
 

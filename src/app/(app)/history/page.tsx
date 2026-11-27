@@ -383,6 +383,7 @@ export default async function HistoryPage({
                         stock={medicine.stock}
                         timeZone={timeZone}
                         role={context.role}
+                        readOnly={context.role === "patient"}
                       />
                     </li>
                   )

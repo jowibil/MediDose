@@ -163,12 +163,14 @@ export default async function DashboardPage() {
                   </span>
                 </span>
               </p>
-              <Link
-                href="/medicines?tab=inventory"
-                className="shrink-0 self-start rounded text-xs font-medium text-brick-ink underline decoration-brick/40 underline-offset-4 hover:decoration-brick-ink focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:self-auto"
-              >
-                Open inventory
-              </Link>
+              {context.role === "patient" ? null : (
+                <Link
+                  href="/medicines?tab=inventory"
+                  className="shrink-0 self-start rounded text-xs font-medium text-brick-ink underline decoration-brick/40 underline-offset-4 hover:decoration-brick-ink focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:self-auto"
+                >
+                  Open inventory
+                </Link>
+              )}
             </div>
           ) : null}
 
@@ -190,12 +192,14 @@ export default async function DashboardPage() {
                   </span>
                 </span>
               </p>
-              <Link
-                href="/medicines?tab=expiration"
-                className="shrink-0 self-start rounded text-xs font-medium text-amber-ink underline decoration-amber/40 underline-offset-4 hover:decoration-amber-ink focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:self-auto"
-              >
-                Review expiration board
-              </Link>
+              {context.role === "patient" ? null : (
+                <Link
+                  href="/medicines?tab=expiration"
+                  className="shrink-0 self-start rounded text-xs font-medium text-amber-ink underline decoration-amber/40 underline-offset-4 hover:decoration-amber-ink focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:self-auto"
+                >
+                  Review expiration board
+                </Link>
+              )}
             </div>
           ) : null}
         </div>
