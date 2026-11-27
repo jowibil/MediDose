@@ -27,12 +27,15 @@ export function DoseControls({
   timeZone,
   role,
   readOnly = false,
+  canLog = true,
 }: {
   occurrence: DoseOccurrence
   stock: number
   timeZone: string
   role: HouseholdRole
   readOnly?: boolean
+  /** False where the surface must not start a dose (an owner's dashboard). */
+  canLog?: boolean
 }) {
   // A patient may record a dose but never revise one: re-marking taken →
   // skipped returns stock, which is a caregiver's job. The persistent line
@@ -150,7 +153,14 @@ export function DoseControls({
 
   return (
     <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:items-end">
-      {pending ? (
+      {pending && !canLog ? (
+        <div className="flex w-full sm:w-auto sm:justify-end">
+          <Badge variant="outline">
+            <Clock3 aria-hidden="true" className="size-3.5" />
+            Pending
+          </Badge>
+        </div>
+      ) : pending ? (
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
           <Button
             size="sm"
@@ -232,7 +242,7 @@ export function DoseControls({
         </div>
       )}
 
-      {pending && outOfStock ? (
+      {pending && outOfStock && canLog ? (
         <p id="dose-out-of-stock" className="text-[11px] text-muted-foreground">
           {isPatient ? (
             <>No doses left. Log this dose as skipped or ask a caregiver to restock.</>

@@ -314,6 +314,7 @@ export default async function DashboardPage() {
                               stock={medicine.stock}
                               timeZone={timeZone}
                               role={context.role}
+                              canLog={context.role !== "owner"}
                             />
                           </li>
                         )

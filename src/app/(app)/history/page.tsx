@@ -384,6 +384,7 @@ export default async function HistoryPage({
                         timeZone={timeZone}
                         role={context.role}
                         readOnly={context.role === "patient"}
+                        canLog={context.role !== "owner"}
                       />
                     </li>
                   )
