@@ -35,8 +35,8 @@ begin
 end;
 $$;
 
--- Fixtures: four auth users. The signup trigger provisions households for the
--- two owners and profiles only for the caregiver/unlinked accounts.
+-- Fixtures: five auth users. The signup trigger provisions households for the
+-- two owners and profiles only for the caregiver/unlinked/patient accounts.
 insert into auth.users (id, email, encrypted_password, email_confirmed_at, raw_user_meta_data)
 values
   ('11111111-1111-1111-1111-111111111111', 'owner-a@rls.test',
@@ -53,7 +53,10 @@ values
    '{"account_type":"caregiver","display_name":"Joiner F"}'::jsonb),
   ('55555555-5555-5555-5555-555555555555', 'owner-d@rls.test',
    extensions.crypt('password', extensions.gen_salt('bf')), now(),
-   '{"account_type":"owner","display_name":"Owner D","household_name":"Household D"}'::jsonb);
+   '{"account_type":"owner","display_name":"Owner D","household_name":"Household D"}'::jsonb),
+  ('66666666-6666-6666-6666-666666666666', 'patient-e@rls.test',
+   extensions.crypt('password', extensions.gen_salt('bf')), now(),
+   '{"account_type":"patient","display_name":"Patient E"}'::jsonb);
 
 select id as household_a from public.households where created_by = '11111111-1111-1111-1111-111111111111' \gset
 select id as household_d from public.households where created_by = '55555555-5555-5555-5555-555555555555' \gset
@@ -104,6 +107,13 @@ select public._assert_true(
 select public._expect_error(
   format('select public.join_household(%L)', :'code_a'),
   'OWNER_CANNOT_JOIN');
+
+-- Owners never log a dose, even with a valid household and medicine.
+select public._expect_error(
+  format(
+    'select public.log_dose(%L, current_date, %L, %L, null, null, %L)',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '08:00', 'taken', 'UTC'),
+  'NOT_AUTHORIZED');
 
 reset role;
 
@@ -229,6 +239,75 @@ select public._expect_error(
   'INVALID_STATUS');
 
 reset role;
+
+-- The owner may not log, but correcting a logged dose stays theirs.
+select set_config('request.jwt.claims', json_build_object('sub', '11111111-1111-1111-1111-111111111111', 'role', 'authenticated')::text, true);
+set local role authenticated;
+
+select public.update_dose_status(:'taken_log', 'taken');
+select public._assert_true(
+  (select stock_on_hand from public.medicines where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb') = 14,
+  'owner can still correct a logged dose');
+
+reset role;
+
+-- ============================ PATIENT E (LINKED) ============================
+-- log_dose() now names its callers explicitly, so a linked patient must still
+-- log their own dose — and only their own.
+select set_config('request.jwt.claims', '{}'::text, true);
+
+update public.patients
+set user_id = '66666666-6666-6666-6666-666666666666'
+where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+insert into public.household_members (household_id, user_id, role)
+values (:'household_a', '66666666-6666-6666-6666-666666666666', 'patient');
+
+-- A sibling patient in the same household, with their own medicine.
+insert into public.patients (id, household_id, name)
+values ('99999999-9999-9999-9999-999999999999', :'household_a', 'Sibling Patient');
+
+insert into public.medicines
+  (id, patient_id, name, dosage_amount, frequency_per_day, schedule_times,
+   stock_on_hand, expiration_date)
+values
+  ('abababab-abab-abab-abab-abababababab', '99999999-9999-9999-9999-999999999999',
+   'Sibling Med', 10, 1, '{08:00}', 10, current_date + 90);
+
+select set_config('request.jwt.claims', json_build_object('sub', '66666666-6666-6666-6666-666666666666', 'role', 'authenticated')::text, true);
+set local role authenticated;
+
+-- Own dose: allowed and recorded against the patient account. 20:00 on the
+-- next day is left free by every other assertion in this file.
+select public.log_dose('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', current_date + 1, '20:00', 'taken', null, null, 'UTC');
+select public._assert_true(
+  exists (
+    select 1 from public.dose_logs
+    where medicine_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+      and scheduled_date = current_date + 1
+      and scheduled_time = '20:00'
+      and status = 'taken'
+      and logged_by = '66666666-6666-6666-6666-666666666666'
+  ),
+  'linked patient can log their own dose');
+
+-- A sibling's dose: refused, and nothing is written.
+select public._expect_error(
+  format(
+    'select public.log_dose(%L, current_date + 1, %L, %L, %L, null, %L)',
+    'abababab-abab-abab-abab-abababababab', '08:00', 'skipped', 'forgot', 'UTC'),
+  'NOT_AUTHORIZED');
+
+reset role;
+
+-- Checked as the migration owner: a patient's RLS hides a sibling's rows, so
+-- "not exists" under the patient role would prove nothing either way.
+select public._assert_true(
+  not exists (
+    select 1 from public.dose_logs
+    where medicine_id = 'abababab-abab-abab-abab-abababababab'
+  ),
+  'refused sibling log writes nothing');
 
 -- ============================ UNLINKED C ============================
 select set_config('request.jwt.claims', json_build_object('sub', '33333333-3333-3333-3333-333333333333', 'role', 'authenticated')::text, true);

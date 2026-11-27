@@ -2,12 +2,20 @@ import { expect, test } from "@playwright/test"
 
 import { loadFixtures, login, resetDoseState } from "./helpers"
 
-test("owner skips a dose with a reason and filters history", async ({ page }) => {
+test("caregiver skips a dose with a reason and filters history", async ({
+  page,
+}) => {
   const fixtures = loadFixtures()
   await resetDoseState(fixtures)
-  await login(page, fixtures.ownerEmail, fixtures.password)
+  await login(page, fixtures.caregiverEmail, fixtures.password)
 
   await page.goto("/dashboard")
+
+  // A caregiver's active patient is a per-session choice; the fixture medicine
+  // belongs to Alex, so select that record explicitly.
+  await page.getByLabel("Active patient").click()
+  await page.getByRole("option", { name: "Alex" }).click()
+
   await page.getByRole("button", { name: "Skip" }).first().click()
 
   await expect(

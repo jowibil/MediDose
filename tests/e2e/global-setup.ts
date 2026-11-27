@@ -57,7 +57,7 @@ async function main() {
     display_name: "Alex Owner",
     household_name: "Playwright Household",
   })
-  await ensureUser(CAREGIVER_EMAIL, {
+  const caregiverId = await ensureUser(CAREGIVER_EMAIL, {
     account_type: "caregiver",
     display_name: "Casey Caregiver",
   })
@@ -68,6 +68,17 @@ async function main() {
     .eq("created_by", ownerId)
     .single()
   if (householdError) throw householdError
+
+  // The caregiver is a member before any spec runs: the owner can no longer
+  // log a dose, so the skip flow runs as the caregiver. Re-joining from
+  // caregiver-join.spec is a no-op and still reports success.
+  const { error: membershipError } = await admin
+    .from("household_members")
+    .upsert(
+      { household_id: household.id, user_id: caregiverId, role: "caregiver" },
+      { onConflict: "household_id,user_id" },
+    )
+  if (membershipError) throw membershipError
 
   const patientIds: Record<string, string> = {}
   for (const name of ["Alex", "Sam"]) {
