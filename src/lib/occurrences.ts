@@ -3,6 +3,7 @@ import type {
   DoseOccurrence,
   SkipReason,
 } from "@/types/medicine"
+import { normalizeTime } from "@/lib/dates"
 import { occurrenceKey } from "@/lib/schedule"
 
 export interface DoseLogRow {
@@ -26,9 +27,17 @@ export function mergeOccurrences(
   logs: DoseLogRow[],
   nameById: Map<string, string>,
 ): DoseOccurrence[] {
+  // Postgres hands back a `time` as "HH:MM:SS"; occurrences are built from
+  // schedule slots as "HH:MM". Without normalising here, every logged dose
+  // failed to match and stayed Pending, so the UI offered Take/Skip again and
+  // the RPC answered DOSE_ALREADY_LOGGED.
   const logByKey = new Map(
     logs.map((log) => [
-      occurrenceKey(log.medicine_id, log.scheduled_date, log.scheduled_time),
+      occurrenceKey(
+        log.medicine_id,
+        log.scheduled_date,
+        normalizeTime(log.scheduled_time),
+      ),
       log,
     ]),
   )
