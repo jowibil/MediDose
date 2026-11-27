@@ -63,7 +63,8 @@ export async function logSkippedAction(input: {
 
 export async function updateDoseStatusAction(input: {
   logId: string
-  status: "taken" | "skipped"
+  /** `pending` removes the log — undoing a mistaken entry. */
+  status: "taken" | "skipped" | "pending"
   reason?: string | null
   note?: string | null
 }): Promise<ActionResult> {

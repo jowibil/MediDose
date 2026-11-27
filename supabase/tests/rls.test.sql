@@ -237,10 +237,32 @@ select public._assert_true(
   ),
   'taken writes dose_taken');
 
--- No revert to pending.
-select public._expect_error(
-  format('select public.update_dose_status(%L, %L)', :'taken_log', 'pending'),
-  'INVALID_STATUS');
+-- Undo to pending: the log is deleted, the slot is free again, and a taken
+-- dose's unit comes back. The compensating ledger row keeps its actor.
+select public.update_dose_status(:'taken_log', 'pending');
+select public._assert_true(
+  (select stock_on_hand from public.medicines where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb') = 15,
+  'taken -> pending restores stock');
+select public._assert_true(
+  not exists (select 1 from public.dose_logs where id = :'taken_log'),
+  'taken -> pending deletes the log');
+select public._assert_true(
+  (select count(*) from public.stock_adjustments
+   where medicine_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+     and reason = 'dose_reverted' and delta = 1) = 2,
+  'undo writes its own dose_reverted row');
+
+-- The slot is pending again, so it can be logged afresh; the owner-correction
+-- check below needs a row to work on.
+select public.log_dose(
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', current_date, '08:00', 'taken',
+  null, null, 'UTC');
+select id as taken_log from public.dose_logs
+where medicine_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+  and scheduled_date = current_date and scheduled_time = '08:00' \gset
+select public._assert_true(
+  (select stock_on_hand from public.medicines where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb') = 14,
+  'a pending slot can be logged again');
 
 reset role;
 

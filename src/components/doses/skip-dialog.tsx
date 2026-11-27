@@ -27,7 +27,6 @@ export function SkipDialog({
   initialReason,
   initialNote,
   pending,
-  mode = "skip",
   onConfirm,
 }: {
   open: boolean
@@ -35,8 +34,6 @@ export function SkipDialog({
   initialReason?: SkipReason | null
   initialNote?: string | null
   pending: boolean
-  /** "undo" reframes the same required-reason flow for a taken dose. */
-  mode?: "skip" | "undo"
   onConfirm: (reason: SkipReason, note: string) => void
 }) {
   return (
@@ -45,7 +42,6 @@ export function SkipDialog({
         {/* DialogContent unmounts when closed, so the form re-initializes
             from the current occurrence each time it opens. */}
         <SkipForm
-          mode={mode}
           initialReason={initialReason ?? null}
           initialNote={initialNote ?? ""}
           pending={pending}
@@ -58,14 +54,12 @@ export function SkipDialog({
 }
 
 function SkipForm({
-  mode,
   initialReason,
   initialNote,
   pending,
   onCancel,
   onConfirm,
 }: {
-  mode: "skip" | "undo"
   initialReason: SkipReason | null
   initialNote: string
   pending: boolean
@@ -75,18 +69,12 @@ function SkipForm({
   const [reason, setReason] = useState<SkipReason | null>(initialReason)
   const [note, setNote] = useState(initialNote)
 
-  const isUndo = mode === "undo"
-
   return (
     <>
       <DialogHeader>
-        <DialogTitle>
-          {isUndo ? "Undo this taken dose?" : "Why was this dose skipped?"}
-        </DialogTitle>
+        <DialogTitle>Why was this dose skipped?</DialogTitle>
         <DialogDescription>
-          {isUndo
-            ? "The dose will be recorded as skipped and its stock returned. Pick the reason so the history stays accurate."
-            : "Pick one reason. The dose stays in your history and stock doesn’t change."}
+          Pick one reason. The dose stays in your history.
         </DialogDescription>
       </DialogHeader>
 

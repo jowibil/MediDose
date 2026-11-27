@@ -55,9 +55,9 @@ TypeScript)** with **Supabase** (Postgres, Auth, Row Level Security).
 | Capability | Owner | Caregiver | Patient account |
 | --- | --- | --- | --- |
 | **Dashboard** dose rows | Status only — Pending / Taken / Skipped | Status only — Pending / Taken / Skipped | Status, plus **Take** / **Skip** on their own doses |
-| **History** dose rows | Correct Taken ↔ Skipped or the skip reason — no new log | Log a pending dose, correct a logged one, change a skip reason | Read-only status |
+| **History** dose rows | Correct a logged dose — *Undo* back to Pending, Taken ↔ Skipped, or the skip reason — no new log | Log a pending dose, correct a logged one, change a skip reason | Read-only status |
 | Log a new Taken / Skipped dose | No — corrections only | Yes, from History | Yes, own doses, from the dashboard |
-| Correct Taken ↔ Skipped | Yes | Yes | No — asks a caregiver |
+| Correct a logged dose (Undo to Pending, Taken ↔ Skipped) | Yes | Yes | No — asks a caregiver |
 | View patients, medicines, doses, stock ledger | Own household | Linked households | Own record only |
 | Create / edit / archive / purge / dispose patients & medicines | Yes | No | No |
 | Restock | Yes | Yes | No |
@@ -71,6 +71,12 @@ A dose action lives in exactly one place per role: an owner and a caregiver
 read today's status on the dashboard and act in History, while a patient account
 is the reverse — it logs from the dashboard and reads History as a record. That
 is why a staff dashboard row has no Take, Skip, Undo or Mark taken button.
+
+*Undo* clears a mistaken entry rather than inventing a reason for it: the log is
+deleted, so the slot is Pending again and can be logged correctly, and a taken
+dose’s unit goes back to stock with a `dose_reverted` ledger row naming who
+returned it. It stays staff-only because returning stock is an accounting
+correction — a patient asks a caregiver.
 
 Roles are chosen at signup and cannot change. An owner has exactly one
 household and can never join another. A patient account is one patient record in

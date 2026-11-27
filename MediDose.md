@@ -20,13 +20,13 @@ Older adults and family caregivers in Panabo City who manage multiple medication
 
 1. **Medicine Owner (Household Manager):**
    * Creates and manages the household medicine cabinet with full Create, Read, Update, and Delete (CRUD) permissions.
-   * Does not log doses: the dashboard shows today's *Pending*, *Taken*, or *Skipped* status with no controls, and the owner's dose action is correcting *Taken* ↔ *Skipped* (or the skip reason) on doses already logged, from History.
+   * Does not log doses: the dashboard shows today's *Pending*, *Taken*, or *Skipped* status with no controls, and the owner's dose action is correcting a logged dose — undoing it back to *Pending*, or switching *Taken* ↔ *Skipped* (or the skip reason) — from History.
    * Shares the household with Caregivers through a unique **6-character Household Invite Code**, and links a Patient account with a **6-character patient link code** issued per patient record (single use, throttled, visible only to the owner).
    * Reviews AI-generated weekly adherence summaries and manages expired medicine disposal.
 2. **Caregiver:**
    * Links their account to one or more Medicine Owners using the **6-character Household Invite Code**.
    * Switches between linked patients from the top navigation bar.
-   * Reads today's dose status on the dashboard — *Pending*, *Taken*, or *Skipped*, with no buttons — and logs a pending dose, corrects a logged one, or changes a skip reason from the **History** page.
+   * Reads today's dose status on the dashboard — *Pending*, *Taken*, or *Skipped*, with no buttons — and logs a pending dose, undoes a mistaken one back to pending, corrects *Taken* ↔ *Skipped*, or changes a skip reason from the **History** page.
    * Restocks supplies, reviews weekly summaries, and prints or copies the pharmacy restock checklist.
 3. **Patient (Older Adult / Household Dependent):**
    * Redeems the owner's **patient link code** at `/join`, which binds the account to exactly one patient record — the household invite code does not grant patient access.

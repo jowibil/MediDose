@@ -45,7 +45,7 @@ export function DoseControls({
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState("")
-  const [dialogMode, setDialogMode] = useState<"skip" | "undo" | null>(null)
+  const [skipOpen, setSkipOpen] = useState(false)
 
   const pending = occurrence.status === "pending"
   const outOfStock = stock <= 0
@@ -94,6 +94,21 @@ export function DoseControls({
     )
   }
 
+  // Undo clears a mistaken log: the slot goes back to Pending and a taken
+  // dose's unit returns to stock. It records no skip reason, because nothing
+  // was skipped.
+  function handleUndo() {
+    if (!occurrence.logId) return
+    run(
+      () =>
+        updateDoseStatusAction({
+          logId: occurrence.logId as string,
+          status: "pending",
+        }),
+      "Dose returned to pending.",
+    )
+  }
+
   function handleSkip(reason: SkipReason, note: string) {
     if (occurrence.logId) {
       run(
@@ -105,7 +120,7 @@ export function DoseControls({
             note,
           }),
         `Dose marked skipped — ${skipReasonLabel(reason)}.`,
-        () => setDialogMode(null),
+        () => setSkipOpen(false),
       )
       return
     }
@@ -121,7 +136,7 @@ export function DoseControls({
           timeZone,
         }),
       `Dose marked skipped — ${skipReasonLabel(reason)}.`,
-      () => setDialogMode(null),
+      () => setSkipOpen(false),
     )
   }
 
@@ -176,7 +191,7 @@ export function DoseControls({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setDialogMode("skip")}
+            onClick={() => setSkipOpen(true)}
             disabled={isPending}
             className="h-11 md:h-9"
           >
@@ -220,7 +235,7 @@ export function DoseControls({
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setDialogMode("undo")}
+                onClick={handleUndo}
                 disabled={isPending}
                 className="h-11 md:h-9"
               >
@@ -232,7 +247,7 @@ export function DoseControls({
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => setDialogMode("skip")}
+              onClick={() => setSkipOpen(true)}
               disabled={isPending}
               className="h-11 md:h-9"
             >
@@ -282,9 +297,8 @@ export function DoseControls({
       ) : null}
 
       <SkipDialog
-        open={dialogMode !== null}
-        onOpenChange={(open) => setDialogMode(open ? (dialogMode ?? "skip") : null)}
-        mode={dialogMode ?? "skip"}
+        open={skipOpen}
+        onOpenChange={setSkipOpen}
         initialReason={
           occurrence.skipReason ?? (outOfStock ? "out_of_stock" : null)
         }
